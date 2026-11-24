@@ -19,22 +19,34 @@
   function fechaReg(r) { return r.fecha ? U.fecha(r.fecha) : (r.anio || 's/f'); }
   function medida(r) { return S.g.medida === 'uni' ? (r.cant || 0) : 1; }
   function linkInst(id, texto) { return '<a data-inst="' + esc(id) + '">' + esc(texto || id) + '</a>'; }
+  function botonIr(ref, texto) {
+    if (!ref || !Datos.hojas[ref[0]]) return '';
+    var t = 'Abrir ' + U.nombreHoja(ref[0]) + (ref[1] ? ' en la celda ' + U.celdaTexto(ref) : '');
+    return '<button type="button" class="btn-ir' + (texto ? ' con-texto' : '') + '" data-ref="' + esc(ref.join('|')) + '" title="' + esc(t) + '" aria-label="' + esc(t) + '">↗' + (texto ? ' ' + esc(texto) : '') + '</button>';
+  }
   function hayMontos() { return Datos.meta && Datos.meta.montos; }
   function etiquetaTipo(t) { return '<span class="tipo-cel tipo-' + t + '"><i class="marca-tipo"></i>' + T[t].uno + '</span>'; }
   function paraExcel(r) {
     var f = [T[r.t].uno, r.fecha ? U.fechaLarga(r.fecha) : '', r.anio || '', r.inst, r.I.nombre !== r.inst ? r.I.nombre : '', r.I.nivel || '', r.I.localidad || '',
-      r.cat, r.det, r.cant, r.prov, r.serv, r.estado, r.fuente];
+      r.cat, r.det, r.cant, r.prov, r.serv, r.estado, r.fuente, U.celdaTexto(r.ref)];
     if (hayMontos()) f.push(r.monto == null ? '' : r.monto, r.fact || '');
     return f;
   }
   function colsExcel() {
     var c = [{ t: 'Tipo', ancho: 10 }, { t: 'Fecha', ancho: 11 }, { t: 'Año', ancho: 7 }, { t: 'Institución', ancho: 16 }, { t: 'Nombre en la base', ancho: 18 },
       { t: 'Nivel', ancho: 16 }, { t: 'Localidad', ancho: 16 }, { t: 'Categoría / rubro', ancho: 20 }, { t: 'Detalle', ancho: 55 }, { t: 'Cantidad', ancho: 9 },
-      { t: 'Proveedor', ancho: 26 }, { t: 'Servicio / OC', ancho: 26 }, { t: 'Estado', ancho: 11 }, { t: 'Planilla', ancho: 22 }];
+      { t: 'Proveedor', ancho: 26 }, { t: 'Servicio / OC', ancho: 26 }, { t: 'Estado', ancho: 11 }, { t: 'Planilla', ancho: 22 }, { t: 'Celda', ancho: 9 }];
     if (hayMontos()) c.push({ t: 'Monto', ancho: 14 }, { t: 'N° factura', ancho: 12 });
     return c;
   }
   function hoy() { return new Date().toLocaleDateString('es-AR'); }
+  function filtrosTexto() {
+    var g = S.g, p = [];
+    p.push(TIPOS.filter(function (t) { return g.tipos.has(t); }).map(function (t) { return T[t].nombre; }).join(', '));
+    p.push(g.anios.size ? 'Años ' + Array.from(g.anios).sort().join(', ') : 'Todos los años');
+    if (g.cat) p.push(g.cat); if (g.nivel) p.push(g.nivel); if (g.gestion) p.push(g.gestion); if (g.localidad) p.push(g.localidad); if (g.prov) p.push(g.prov);
+    return p.join(' · ');
+  }
 
   // ───────────────────────── navegación
   function irA(vista, push) {
@@ -69,7 +81,7 @@
   function pintar() {
     if (!Datos.listo) { esqueleto(); return; }
     $('#cuentaRegistros').textContent = n(Datos.regs.length);
-    var nAv = Datos.avisos.length + institucionesFuera().length;
+    var nAv = Datos.avisos.length + institucionesFuera().length;   // los nombres ya unificados no cuentan
     $('#cuentaAvisos').textContent = nAv ? n(nAv) : '';
     if (S.vista === 'buscador') { pintarFicha(); pintarLista(); }
     if (S.vista === 'general') pintarGeneral();
@@ -177,7 +189,7 @@
     var html = '<article class="card sec"><div class="card-body"><div class="ficha-cab"><div>' +
       '<h2>🏫 ' + esc(i.id) + '</h2><div class="completo">' + esc(i.completo || (i.enBase ? '' : 'No está en la hoja ESTABLECIMIENTOS')) + '</div>' +
       '<div class="etiquetas">' + etiq + '</div>' + alias + '</div>' +
-      '<div class="fila no-print"><button class="btn btn-secondary btn-sm" id="fLink">🔗 Copiar link</button><button class="btn btn-secondary btn-sm" id="fExcel">⬇️ Excel</button>' +
+      '<div class="fila no-print">' + menuPlanillas(i, regs) + '<button class="btn btn-secondary btn-sm" id="fLink">🔗 Copiar link</button><button class="btn btn-secondary btn-sm" id="fExcel">⬇️ Excel</button>' +
       '<button class="btn btn-secondary btn-sm" id="fPrint">🖨️ Imprimir</button><button class="btn btn-secondary btn-sm" id="fCerrar" title="Volver a la lista">✕</button></div></div></div></article>';
 
     html += '<div class="kpis">' +
@@ -212,7 +224,7 @@
     // Qué recibió
     var cats = new Map();
     regs.forEach(function (r) { var k = r.t + '|' + r.cat; var c = cats.get(k) || { t: r.t, cat: r.cat, reg: 0, cant: 0, ult: 0 }; c.reg++; c.cant += r.cant; c.ult = Math.max(c.ult, r.anio || 0); cats.set(k, c); });
-    var citems = Array.from(cats.values()).sort(function (a, b) { return b.reg - a.reg; }).map(function (c) {
+    var citems = U.sinAlFinal(Array.from(cats.values()).sort(function (a, b) { return b.reg - a.reg; }), function (c) { return c.cat; }).map(function (c) {
       return { lab: U.icono(c.cat) + ' ' + esc(c.cat), titulo: T[c.t].uno + ' · ' + c.cat, total: c.reg, partes: [{ t: c.t, v: c.reg }],
         sub: (c.t === 'E' ? n(c.cant) + ' unidades · ' : '') + 'último: ' + (c.ult || 's/f'),
         onClick: function () { S.ficha.tab = c.t; S.ficha.cat = c.cat; pintarFicha(); $('#fTabla').scrollIntoView({ behavior: 'smooth', block: 'center' }); } };
@@ -233,6 +245,25 @@
     $('#fCat').onchange = function () { S.ficha.cat = this.value; pintarTablaFicha(regs); };
     pintarTablaFicha(regs);
   }
+  /** "📄 Ver en planillas": dónde aparece esta institución, con acceso directo a la primera fila de cada hoja */
+  function menuPlanillas(i, regs) {
+    var porHoja = new Map();
+    regs.forEach(function (r) {
+      if (!r.ref) return;
+      var o = porHoja.get(r.ref[0]) || { n: 0, ref: r.ref, tipos: {} };
+      o.n++; o.tipos[r.t] = 1; if (r.ref[1] < o.ref[1]) o.ref = r.ref; porHoja.set(r.ref[0], o);
+    });
+    var items = [];
+    if (i.ref && i.ref[0] === 'ES') items.push(['ESTABLECIMIENTOS', 'Datos de la institución', i.ref]);
+    ['EN', 'HI', 'UN', 'OB', 'IT'].forEach(function (h) {
+      var o = porHoja.get(h); if (!o) return;
+      items.push([U.nombreHoja(h), n(o.n) + ' ' + (o.n === 1 ? 'registro' : 'registros') + ' · ' + Object.keys(o.tipos).map(function (t) { return T[t].nombre.toLowerCase(); }).join(', '), o.ref]);
+    });
+    if (!items.length || !Object.keys(Datos.hojas).length) return '';
+    return '<details class="menu-planillas"><summary class="btn btn-secondary btn-sm">📄 Ver en planillas</summary><div class="menu-caja">' +
+      '<div class="chico muted" style="padding:.2rem .3rem .4rem">Abre la planilla en la primera fila de esta institución. Cada registro del detalle tiene su propio ↗.</div>' +
+      items.map(function (x) { return '<div class="menu-item"><div><b>' + esc(x[0]) + '</b><div class="chico muted">' + esc(x[1]) + '</div></div>' + botonIr(x[2], 'Abrir') + '</div>'; }).join('') + '</div></details>';
+  }
   function kpi(t, et, val, sub) {
     return '<div class="kpi click tipo-' + t + '" data-kpi="' + t + '"><div class="et"><i class="marca-tipo"></i>' + et + '</div><div class="val">' + val + '</div><div class="sub">' + esc(sub) + '</div></div>';
   }
@@ -244,7 +275,7 @@
   function pintarTablaFicha(regs) {
     var t = S.ficha.tab, base = regs.filter(function (r) { return r.t === t; });
     U.opciones($('#fAnio'), valores(base, function (r) { return r.anio; }).sort().reverse(), 'Todos los años', S.ficha.anio);
-    U.opciones($('#fCat'), valores(base, function (r) { return r.cat; }).sort(ordenEs), 'Todas', S.ficha.cat);
+    U.opciones($('#fCat'), valores(base, function (r) { return r.cat; }).sort(U.ordenTexto), 'Todas', S.ficha.cat);
     var q = U.norm(S.ficha.q);
     var rs = base.filter(function (r) {
       return (!S.ficha.anio || String(r.anio) === S.ficha.anio) && (!S.ficha.cat || r.cat === S.ficha.cat) && (!q || r.busca.indexOf(q) >= 0);
@@ -265,13 +296,13 @@
     if (conInst) cols.push(['inst', 'Institución', 0, 150]);
     cols.push(['cat', 'Categoría', 0, 158], ['det', 'Detalle', 0, 0], ['cant', 'Cant.', 1, 64], ['prov', 'Proveedor', 0, 170]);
     if (m) cols.push(['monto', 'Monto', 1, 110], ['fact', 'Factura', 0, 90]);
-    cols.push(['fuente', 'Planilla', 0, 140]);
+    cols.push(['fuente', 'Planilla', 0, 140], ['ir', '', 0, 46]);
     var minimo = cols.reduce(function (s, c) { return s + (c[3] || 260); }, 0);
     function celda(clase, texto, html) { return '<td class="' + clase + '" title="' + esc(texto) + '">' + (html == null ? esc(texto) : html) + '</td>'; }
     return '<table class="tabla-fija" style="min-width:' + minimo + 'px"><colgroup>' + cols.map(function (c) { return '<col' + (c[3] ? ' style="width:' + c[3] + 'px"' : '') + '>'; }).join('') +
       '</colgroup><thead><tr>' + cols.map(function (c) {
       var o = orden && orden.col === c[0];
-      return '<th class="' + (orden ? 'ord' : '') + (c[2] ? ' num' : '') + '" data-col="' + c[0] + '">' + c[1] + (o ? ' <span class="flecha">' + (orden.dir > 0 ? '▲' : '▼') + '</span>' : '') + '</th>';
+      return '<th class="' + (orden && c[0] !== 'ir' ? 'ord' : '') + (c[2] ? ' num' : '') + '" data-col="' + c[0] + '">' + c[1] + (o ? ' <span class="flecha">' + (orden.dir > 0 ? '▲' : '▼') + '</span>' : '') + '</th>';
     }).join('') + '</tr></thead><tbody>' + rs.map(function (r) {
       var detTitulo = r.det + (r.serv && r.t !== 'O' ? ' — ' + r.serv : '');
       return '<tr>' + (conInst ? celda('', T[r.t].uno, etiquetaTipo(r.t)) : '') + celda('fecha', String(fechaReg(r))) +
@@ -279,7 +310,7 @@
         celda('', r.cat, U.icono(r.cat) + '&nbsp;' + esc(r.cat)) + celda('', detTitulo, esc(r.det)) +
         celda('num', n(r.cant)) + celda('chico', r.prov) +
         (m ? celda('num', r.monto == null ? '' : '$ ' + n(r.monto)) + celda('chico', r.fact || '') : '') +
-        celda('fuente', r.fuente) + '</tr>';
+        celda('fuente', r.fuente) + '<td class="ir">' + botonIr(r.ref) + '</td></tr>';
     }).join('') + '</tbody></table>';
   }
 
@@ -306,10 +337,15 @@
   function partes(o) { return TIPOS.filter(function (t) { return S.g.tipos.has(t); }).map(function (t) { return { t: t, v: o[t] }; }); }
   function topConOtros(arr, k, nombreOtros) {
     arr.sort(function (a, b) { return b.total - a.total; });
-    if (arr.length <= k) return arr;
-    var resto = arr.slice(k - 1), o = { k: nombreOtros || 'Otros', E: 0, O: 0, A: 0, total: 0, otros: resto.length };
-    resto.forEach(function (x) { TIPOS.forEach(function (t) { o[t] += x[t]; }); o.total += x.total; });
-    return arr.slice(0, k - 1).concat([o]);
+    var sin = arr.filter(function (x) { return U.esSin(x.k); });
+    arr = arr.filter(function (x) { return !U.esSin(x.k); });
+    k = k - sin.length;
+    if (arr.length > k) {
+      var resto = arr.slice(k - 1), o = { k: nombreOtros || 'Otros', E: 0, O: 0, A: 0, total: 0, otros: resto.length };
+      resto.forEach(function (x) { TIPOS.forEach(function (t) { o[t] += x[t]; }); o.total += x.total; });
+      arr = arr.slice(0, k - 1).concat([o]);
+    }
+    return arr.concat(sin);                   // "Sin tipo" / "Sin dato" siempre al final
   }
 
   function pintarControlesGeneral() {
@@ -322,12 +358,12 @@
       return '<button class="chip" data-a="' + a + '" aria-pressed="' + g.anios.has(a) + '">' + a + '</button>';
     }).join('');
     var base = Datos.regs.filter(function (r) { return g.tipos.has(r.t); });
-    U.opciones($('#gCat'), valores(base, function (r) { return r.cat; }).sort(ordenEs).map(function (c) { return [c, U.icono(c) + ' ' + c]; }), 'Todas', g.cat);
+    U.opciones($('#gCat'), valores(base, function (r) { return r.cat; }).sort(U.ordenTexto).map(function (c) { return [c, U.icono(c) + ' ' + c]; }), 'Todas', g.cat);
     var insts = Array.from(Datos.inst.values());
-    U.opciones($('#gNivel'), valores(insts, function (i) { return i.nivel; }).sort(ordenEs), 'Todos', g.nivel);
-    U.opciones($('#gGestion'), valores(insts, function (i) { return i.gestion; }).sort(ordenEs), 'Todas', g.gestion);
-    U.opciones($('#gLocalidad'), valores(insts, function (i) { return i.localidad; }).sort(ordenEs), 'Todas', g.localidad);
-    U.opciones($('#gProv'), valores(base, function (r) { return r.prov; }).sort(ordenEs), 'Todos', g.prov);
+    U.opciones($('#gNivel'), valores(insts, function (i) { return i.nivel; }).sort(U.ordenTexto), 'Todos', g.nivel);
+    U.opciones($('#gGestion'), valores(insts, function (i) { return i.gestion; }).sort(U.ordenTexto), 'Todas', g.gestion);
+    U.opciones($('#gLocalidad'), valores(insts, function (i) { return i.localidad; }).sort(U.ordenTexto), 'Todas', g.localidad);
+    U.opciones($('#gProv'), valores(base, function (r) { return r.prov; }).sort(U.ordenTexto), 'Todos', g.prov);
     $$('#gMedida button').forEach(function (b) { b.setAttribute('aria-selected', String(b.dataset.m === g.medida)); });
     $$('#gRankModo button').forEach(function (b) { b.setAttribute('aria-selected', String(b.dataset.m === g.rank)); });
   }
@@ -346,9 +382,9 @@
       '<div class="kpi"><div class="et">🧾 Registros</div><div class="val">' + n(rs.length) + '</div><div class="sub">' + TIPOS.filter(function (t) { return g.tipos.has(t); }).map(function (t) { return T[t].nombre + ' ' + n(porT[t]); }).join(' · ') + '</div></div>' +
       '<div class="kpi"><div class="et">📦 Unidades</div><div class="val">' + n(totUni) + '</div><div class="sub">sumando cantidades</div></div>' +
       '<div class="kpi"><div class="et">🏫 Instituciones alcanzadas</div><div class="val">' + n(instCon.size) + '</div><div class="sub">con al menos un registro</div></div>' +
-      '<div class="kpi click" id="kSinNada"><div class="et">⚠️ Sin ningún registro</div><div class="val">' + n(sinNada.length) + '</div><div class="sub">de ' + n(baseInst.length) + ' en ESTABLECIMIENTOS · ver</div></div>' +
-      '<div class="kpi"><div class="et">🚚 Proveedores</div><div class="val">' + n(provs.size) + '</div><div class="sub">con facturación cargada</div></div>';
-    $('#kSinNada').onclick = function () { S.g.rank = 'menos'; pintarGeneral(); $('#gRank').scrollIntoView({ behavior: 'smooth', block: 'center' }); };
+      '<div class="kpi"><div class="et">🚚 Proveedores</div><div class="val">' + n(provs.size) + '</div><div class="sub">con facturación cargada</div></div>' +
+      '<div class="kpi click" id="kSinNada"><div class="et">⚠️ Sin ningún registro</div><div class="val">' + n(sinNada.length) + '</div><div class="sub">de ' + n(baseInst.length) + ' en ESTABLECIMIENTOS · ver cuáles</div></div>';
+    $('#kSinNada').onclick = function () { S.g.rank = 'sin'; S.g.rankTodas = false; pintarGeneral(); $('#gRank').scrollIntoView({ behavior: 'smooth', block: 'center' }); };
 
     // Evolución anual
     var anios = valores(rs, function (r) { return r.anio; }).sort();
@@ -367,24 +403,49 @@
         onClick: o.otros ? null : function () { g.cat = o.k; pintarGeneral(); U.toast('Filtrado: ' + o.k); } };
     }));
 
-    // Ranking instituciones
+    // Ranking instituciones: Más · Menos (1 o más) · Sin registros (0)
     var porInst = agrupar(rs, function (r) { return r.inst; });
-    var lista;
+    var conAlgo = porInst.filter(function (o) { return o.total > 0; });
+    var lista, titulo;
     if (g.rank === 'mas') {
-      lista = porInst.sort(function (a, b) { return b.total - a.total; }).slice(0, 15);
-      $('#gRankSub').textContent = 'Las 15 que más ' + med + ' tienen';
+      lista = conAlgo.sort(function (a, b) { return b.total - a.total || ordenEs(a.k, b.k); });
+      titulo = 'Las que más ' + med + ' tienen';
+    } else if (g.rank === 'menos') {
+      lista = conAlgo.sort(function (a, b) { return a.total - b.total || ordenEs(a.k, b.k); });
+      titulo = 'Las que menos ' + med + ' tienen (con 1 o más)';
     } else {
-      var m = new Map(porInst.map(function (o) { return [o.k, o]; }));
-      lista = baseInst.map(function (i) { return m.get(i.id) || { k: i.id, E: 0, O: 0, A: 0, total: 0 }; })
-        .sort(function (a, b) { return a.total - b.total || ordenEs(a.k, b.k); }).slice(0, 15);
-      $('#gRankSub').textContent = 'Las 15 de ESTABLECIMIENTOS con menos ' + med + ' (incluye las que tienen 0)';
+      lista = sinNada.slice().sort(function (a, b) { return ordenEs(a.id, b.id); }).map(function (i) { return { k: i.id, E: 0, O: 0, A: 0, total: 0 }; });
+      titulo = 'Instituciones de ESTABLECIMIENTOS sin ningún registro con estos filtros';
     }
-    var maxRank = g.rank === 'menos' ? Math.max.apply(null, porInst.map(function (o) { return o.total; }).concat([1])) : null;
-    G.barrasH($('#gRank'), lista.map(function (o) {
-      var i = Datos.inst.get(o.k) || {};
-      return { lab: '<b>' + esc(o.k) + '</b>', titulo: o.k + (i.completo ? ' · ' + i.completo : ''), sub: [i.nivel, i.localidad].filter(Boolean).join(' · '), total: o.total, partes: partes(o),
-        onClick: function () { abrirFicha(o.k); } };
-    }), { max: maxRank });
+    S.rankLista = lista;
+    var mostrar = g.rankTodas ? lista : lista.slice(0, 15);
+    $('#gRankSub').textContent = titulo + ' · ' + (g.rankTodas || lista.length <= 15 ? n(lista.length) : '15 de ' + n(lista.length));
+    $('#gRankModo').innerHTML = [['mas', 'Más'], ['menos', 'Menos'], ['sin', 'Sin registros <span class="cuenta">' + n(sinNada.length) + '</span>']].map(function (b) {
+      return '<button role="tab" data-m="' + b[0] + '" aria-selected="' + (g.rank === b[0]) + '">' + b[1] + '</button>';
+    }).join('');
+    if (g.rank === 'sin') {
+      $('#gRank').innerHTML = lista.length ? '<div class="tabla-caja' + (g.rankTodas ? ' alto-max' : '') + '"><table><thead><tr><th>Institución</th><th>Nivel</th><th>Localidad</th><th>Gestión</th></tr></thead><tbody>' +
+        mostrar.map(function (o) { var i = Datos.inst.get(o.k) || {}; return '<tr><td class="inst">' + linkInst(o.k) + '</td><td>' + esc(i.nivel) + '</td><td>' + esc(i.localidad) + '</td><td>' + esc(i.gestion) + '</td></tr>'; }).join('') +
+        '</tbody></table></div>' : '<div class="vacio"><span class="grande">✅</span>Todas tienen al menos un registro con estos filtros</div>';
+    } else {
+      var maxRank = Math.max.apply(null, lista.map(function (o) { return o.total; }).concat([1]));
+      G.barrasH($('#gRank'), mostrar.map(function (o) {
+        var i = Datos.inst.get(o.k) || {};
+        return { lab: '<b>' + esc(o.k) + '</b>', titulo: o.k + (i.completo ? ' · ' + i.completo : ''), sub: [i.nivel, i.localidad].filter(Boolean).join(' · '), total: o.total, partes: partes(o),
+          onClick: function () { abrirFicha(o.k); } };
+      }), { max: maxRank });
+      if (g.rankTodas) $('#gRank .barras-h').classList.add('alto-max');
+    }
+    $('#gRankPie').innerHTML = (lista.length > 15 ? '<button class="btn btn-secondary btn-sm" id="gRankTodas">' + (g.rankTodas ? '▴ Ver menos' : '▾ Ver todas (' + n(lista.length) + ')') + '</button>' : '') +
+      (lista.length ? '<button class="btn btn-secondary btn-sm" id="gRankExcel">⬇️ Excel</button>' : '');
+    if ($('#gRankTodas')) $('#gRankTodas').onclick = function () { g.rankTodas = !g.rankTodas; pintarGeneral(); };
+    if ($('#gRankExcel')) $('#gRankExcel').onclick = function () {
+      var nom = { mas: 'con más', menos: 'con menos', sin: 'sin registros' }[g.rank];
+      exportarExcel('SAE Entregas - instituciones ' + nom, [{ nombre: 'Instituciones', titulo: 'Instituciones ' + nom + ' (' + med + ')', subtitulo: filtrosTexto() + ' · descargado el ' + hoy(),
+        columnas: [{ t: 'Institución', ancho: 18 }, { t: 'Nombre completo', ancho: 40 }, { t: 'Nivel', ancho: 18 }, { t: 'Localidad', ancho: 18 }, { t: 'Gestión', ancho: 12 },
+          { t: 'Entregas' }, { t: 'Obras' }, { t: 'Arreglos' }, { t: 'Total' }],
+        filas: lista.map(function (o) { var i = Datos.inst.get(o.k) || {}; return [o.k, i.completo || '', i.nivel || '', i.localidad || '', i.gestion || '', o.E, o.O, o.A, o.total]; }) }]);
+    };
 
     // Proveedores
     var pv = topConOtros(agrupar(rs, function (r) { return r.prov; }), 12);
@@ -394,7 +455,7 @@
     }), { vacio: 'Los registros filtrados no tienen proveedor (las obras y entregas de BASE DE DATOS no lo cargan)' });
 
     // Nivel y localidad
-    var nv = agrupar(rs, function (r) { return r.I.nivel || 'Sin dato'; }).sort(function (a, b) { return b.total - a.total; });
+    var nv = U.sinAlFinal(agrupar(rs, function (r) { return r.I.nivel || 'Sin dato'; }).sort(function (a, b) { return b.total - a.total; }), function (o) { return o.k; });
     G.barrasH($('#gNiveles'), nv.map(function (o) {
       return { lab: esc(o.k), total: o.total, partes: partes(o), sub: med, onClick: o.k === 'Sin dato' ? null : function () { g.nivel = o.k; pintarGeneral(); } };
     }));
@@ -408,7 +469,7 @@
   }
 
   function datosCalor(rs) {
-    var catsT = agrupar(rs, function (r) { return r.cat; }).sort(function (a, b) { return b.total - a.total; }).map(function (o) { return o.k; });
+    var catsT = U.sinAlFinal(agrupar(rs, function (r) { return r.cat; }).sort(function (a, b) { return b.total - a.total; }).map(function (o) { return o.k; }));
     var filas = agrupar(rs, function (r) { return r.inst; }).sort(function (a, b) { return b.total - a.total; }).slice(0, S.g.calorN);
     var celdas = new Map();
     rs.forEach(function (r) { var k = r.inst + '|' + r.cat; celdas.set(k, (celdas.get(k) || 0) + medida(r)); });
@@ -418,7 +479,7 @@
     var d = datosCalor(rs), dark = document.documentElement.classList.contains('dark');
     if (!d.filas.length) { $('#gCalor').innerHTML = '<div class="vacio"><span class="grande">📭</span>Sin datos para estos filtros</div>'; return; }
     var max = 0; d.celdas.forEach(function (v) { if (v > max) max = v; });
-    $('#gCalor').innerHTML = '<table><thead><tr><th>Institución</th>' + d.cats.map(function (c) { return '<th class="rot" title="' + esc(c) + '">' + U.icono(c) + '<br>' + esc(c) + '</th>'; }).join('') +
+    $('#gCalor').innerHTML = '<table><thead><tr><th>Institución</th>' + d.cats.map(function (c) { return '<th class="rot" title="' + esc(c) + '"><span class="ico">' + U.icono(c) + '</span> ' + esc(c) + '</th>'; }).join('') +
       '<th class="num">Total</th></tr></thead><tbody>' + d.filas.map(function (f) {
         return '<tr><td class="inst">' + linkInst(f.k) + '</td>' + d.cats.map(function (c) {
           var v = d.celdas.get(f.k + '|' + c) || 0, s = G.secuencial(v / max), i = s.bg.match(/\d/);
@@ -442,7 +503,7 @@
     U.opciones($('#rTipo'), TIPOS.map(function (t) { return [t, T[t].icono + ' ' + T[t].nombre]; }), 'Todos', r.tipo);
     var base = Datos.regs.filter(function (x) { return !r.tipo || x.t === r.tipo; });
     U.opciones($('#rAnio'), valores(Datos.regs, function (x) { return x.anio; }).sort().reverse(), 'Todos', r.anio);
-    U.opciones($('#rCat'), valores(base, function (x) { return x.cat; }).sort(ordenEs), 'Todas', r.cat);
+    U.opciones($('#rCat'), valores(base, function (x) { return x.cat; }).sort(U.ordenTexto), 'Todas', r.cat);
     U.opciones($('#rFuente'), valores(Datos.regs, function (x) { return x.fuente; }).sort(), 'Todas', r.fuente);
     var rs = filtrarRegistros();
     var col = r.col, dir = r.dir;
@@ -468,38 +529,75 @@
 
   // ───────────────────────── CALIDAD
   function institucionesFuera() {
-    return Array.from(Datos.inst.values()).filter(function (i) { return !i.enBase && (i.E + i.O + i.A); });
+    return Array.from(Datos.inst.values()).filter(function (i) { return !i.enBase && i.id !== 'SIN DATOS' && (i.E + i.O + i.A); });
+  }
+  var PROBLEMAS = [
+    ['fuera', '🏫', 'No está en ESTABLECIMIENTOS', 'Tiene registros pero no figura en la base. Si falta, agregala en ESTABLECIMIENTOS; si es otra institución escrita distinto, se suma en ALIAS del Apps Script.'],
+    ['sin_inst', '❓', 'Fila sin institución', 'El registro no dice a qué institución va, así que no aparece en ninguna ficha. Completá la celda.'],
+    ['otra_inst', '🔀', 'El detalle nombra otra institución', 'La obra está cargada en una escuela pero el detalle menciona otra. Revisá cuál es la correcta.'],
+    ['sin_datos', '🚫', 'Cargada como "SIN DATOS"', 'La institución figura como SIN DATOS. Si se sabe cuál es, reemplazalo.'],
+    ['sin_tipo', '🏗️', 'Obra sin tipo', 'La obra no tiene "Tipo de Obra". En la página aparece como "Sin tipo".'],
+    ['repetida', '📑', 'Repetida en ESTABLECIMIENTOS', 'La misma institución está dos veces en la base; la página usa la primera.'],
+    ['alias', '✏️', 'Escrita de otra forma (ya unificada)', 'La página ya la junta con la correcta. No hace falta hacer nada; si querés dejarlo prolijo, corregí el nombre en la planilla.'],
+    ['hoja', '❌', 'Hoja que no se pudo leer', 'Revisá que la hoja exista con ese nombre y que la cuenta del Apps Script tenga acceso.'],
+    ['otros', '⚠️', 'Otros avisos', 'Avisos de una versión anterior del Apps Script.']
+  ];
+  function problemasCalidad() {
+    var L = [];
+    institucionesFuera().forEach(function (i) {
+      L.push({ tipo: 'fuera', h: i.ref ? i.ref[0] : '', ref: i.ref, inst: i.id,
+        texto: i.id + ' · ' + [i.E ? i.E + ' entregas' : '', i.O ? i.O + ' obras' : '', i.A ? i.A + ' arreglos' : ''].filter(Boolean).join(', ') +
+          ((i.alias || []).length ? ' · escrita como: ' + i.alias.join(' / ') : '') });
+    });
+    Datos.inst.forEach(function (i) {
+      (i.alias || []).forEach(function (a) {
+        var ref = i.aliasRef && Array.isArray(i.aliasRef[a]) ? i.aliasRef[a] : null;
+        L.push({ tipo: 'alias', h: ref ? ref[0] : '', ref: ref, inst: i.id, texto: '“' + a + '” se tomó como ' + i.id });
+      });
+    });
+    Datos.avisos.forEach(function (a) {
+      var t = a.tipo && PROBLEMAS.some(function (p) { return p[0] === a.tipo; }) ? a.tipo : 'otros';
+      L.push({ tipo: t, h: a.h || '', hojaNom: a.hoja, fila: a.fila, ref: a.h && a.fila ? [a.h, a.fila, a.col || 1] : null, texto: a.texto });
+    });
+    return L;
   }
   function pintarCalidad() {
-    var fuera = institucionesFuera().sort(function (a, b) { return (b.E + b.O + b.A) - (a.E + a.O + a.A); });
-    var conAlias = Array.from(Datos.inst.values()).filter(function (i) { return (i.alias || []).length; });
-    var grupos = new Map(); Datos.avisos.forEach(function (a) { var g = grupos.get(a.hoja) || []; g.push(a); grupos.set(a.hoja, g); });
-    var html = '<div class="aviso" style="margin-bottom:1rem">🩺 Acá aparece lo que no cierra en las planillas. <b>La página no cambia nada:</b> sirve para que el equipo lo corrija en la planilla o, si es la misma institución escrita distinto, se agregue en <code>ALIAS</code> del Apps Script.</div>' +
-      '<div class="kpis"><div class="kpi"><div class="et">🏫 Fuera de ESTABLECIMIENTOS</div><div class="val">' + n(fuera.length) + '</div><div class="sub">nombres con registros que no están en la base</div></div>' +
-      '<div class="kpi"><div class="et">✏️ Nombres unificados</div><div class="val">' + n(conAlias.length) + '</div><div class="sub">instituciones escritas de más de una forma</div></div>' +
-      '<div class="kpi"><div class="et">⚠️ Avisos</div><div class="val">' + n(Datos.avisos.length) + '</div><div class="sub">filas incompletas o raras</div></div></div>';
-    html += '<article class="card"><div class="card-header"><div><h2>🏫 No están en ESTABLECIMIENTOS</h2><p class="card-subtitle">Pueden ser instituciones que faltan en la base o nombres mal escritos</p></div>' +
-      '<button class="btn btn-secondary btn-sm" id="cExcel">⬇️ Excel con todo</button></div><div class="card-body"><div class="tabla-caja alto-max">' +
-      (fuera.length ? '<table><thead><tr><th>Nombre</th><th class="num">Entregas</th><th class="num">Obras</th><th class="num">Arreglos</th><th>Escrita como</th></tr></thead><tbody>' + fuera.map(function (i) {
-        return '<tr><td class="inst">' + linkInst(i.id) + '</td><td class="num">' + i.E + '</td><td class="num">' + i.O + '</td><td class="num">' + i.A + '</td><td class="chico">' + esc((i.alias || []).join(' · ')) + '</td></tr>';
-      }).join('') + '</tbody></table>' : '<div class="vacio">✅ Todas las instituciones coinciden con la base</div>') + '</div></div></article>';
-    html += '<article class="card"><div class="card-header"><div><h2>✏️ Nombres unificados</h2><p class="card-subtitle">Se juntaron solos porque son la misma institución escrita distinto</p></div></div><div class="card-body"><div class="tabla-caja alto-max">' +
-      (conAlias.length ? '<table><thead><tr><th>Queda como</th><th>Aparecía como</th></tr></thead><tbody>' + conAlias.map(function (i) {
-        return '<tr><td class="inst">' + linkInst(i.id) + '</td><td>' + i.alias.map(function (a) { return '<code>' + esc(a) + '</code>'; }).join(' ') + '</td></tr>';
-      }).join('') + '</tbody></table>' : '<div class="vacio">Sin nombres para unificar</div>') + '</div></div></article>';
-    html += '<article class="card"><div class="card-header"><div><h2>⚠️ Avisos por planilla</h2><p class="card-subtitle">Con el número de fila para encontrarla rápido</p></div></div><div class="card-body">' +
-      (grupos.size ? Array.from(grupos.entries()).map(function (e) {
-        return '<details class="grupo-avisos"><summary>' + esc(e[0]) + ' · ' + n(e[1].length) + '</summary><div class="lista-avisos" style="padding-bottom:.8rem">' +
-          e[1].map(function (a) { return '<div class="aviso naranja">Fila <b>' + a.fila + '</b> · ' + esc(a.texto) + '</div>'; }).join('') + '</div></details>';
-      }).join('') : '<div class="vacio">✅ Sin avisos</div>') + '</div></article>';
+    var L = problemasCalidad();
+    var hojas = valores(L, function (x) { return x.h; });
+    if (S.calHoja && hojas.indexOf(S.calHoja) < 0) S.calHoja = '';
+    var Lf = L.filter(function (x) { return !S.calHoja || x.h === S.calHoja; });
+    var fuera = L.filter(function (x) { return x.tipo === 'fuera'; }).length, alias = L.filter(function (x) { return x.tipo === 'alias'; }).length;
+    var html = '<div class="aviso" style="margin-bottom:1rem">🩺 <b>Qué es esto:</b> la lista de cosas que no cierran en las planillas, agrupadas por problema. ' +
+      'La página <b>no corrige nada</b>: tocá <b>↗ Ir a la celda</b> para abrir la planilla justo donde hay que revisar. Cuando se corrige en la planilla, ' +
+      'el aviso desaparece la próxima vez que tocás 🔄 Actualizar.</div>' +
+      '<div class="kpis"><div class="kpi"><div class="et">🧾 Para revisar</div><div class="val">' + n(L.length - alias) + '</div><div class="sub">sin contar los nombres ya unificados</div></div>' +
+      '<div class="kpi"><div class="et">🏫 Fuera de ESTABLECIMIENTOS</div><div class="val">' + n(fuera) + '</div><div class="sub">instituciones con registros</div></div>' +
+      '<div class="kpi"><div class="et">✏️ Nombres unificados</div><div class="val">' + n(alias) + '</div><div class="sub">no hace falta hacer nada</div></div></div>';
+    html += '<article class="card"><div class="card-header"><div><h2>🩺 Problemas por tipo</h2><p class="card-subtitle">' + n(Lf.length) + ' avisos' + (S.calHoja ? ' en ' + esc(U.nombreHoja(S.calHoja)) : '') + '</p></div>' +
+      '<button class="btn btn-secondary btn-sm" id="cExcel">⬇️ Excel</button></div><div class="card-body">' +
+      '<div class="campo" style="margin-bottom:.8rem"><label>Planilla</label><div class="chips" id="cHojas"><button class="chip" data-h="" aria-pressed="' + !S.calHoja + '">Todas</button>' +
+      hojas.sort(function (a, b) { return ordenEs(U.nombreHoja(a), U.nombreHoja(b)); }).map(function (h) {
+        return '<button class="chip" data-h="' + esc(h) + '" aria-pressed="' + (S.calHoja === h) + '">' + esc(U.nombreHoja(h)) + ' <span class="n">' + L.filter(function (x) { return x.h === h; }).length + '</span></button>';
+      }).join('') + '</div></div>';
+    var grupos = PROBLEMAS.map(function (p) { return { p: p, items: Lf.filter(function (x) { return x.tipo === p[0]; }) }; }).filter(function (g) { return g.items.length; });
+    html += grupos.length ? grupos.map(function (g) {
+      return '<details class="grupo-avisos"><summary><span>' + g.p[1] + ' ' + esc(g.p[2]) + '</span> <span class="pill sin">' + n(g.items.length) + '</span></summary>' +
+        '<div class="chico muted" style="margin:0 0 .6rem">' + esc(g.p[3]) + '</div><div class="lista-avisos" style="padding-bottom:.8rem">' +
+        g.items.slice(0, 500).map(function (x) {
+          var donde = x.ref ? U.nombreHoja(x.ref[0]) + (x.ref[1] ? ' · celda ' + U.celdaTexto(x.ref) : '') : (x.hojaNom ? x.hojaNom + (x.fila ? ' · fila ' + x.fila : '') : '');
+          return '<div class="aviso-fila"><div><div>' + (x.inst ? linkInst(x.inst, x.texto) : esc(x.texto)) + '</div>' + (donde ? '<div class="chico muted">' + esc(donde) + '</div>' : '') + '</div>' +
+            (x.ref ? botonIr(x.ref, 'Ir a la celda') : '') + '</div>';
+        }).join('') + (g.items.length > 500 ? '<div class="chico muted">Se muestran 500 de ' + n(g.items.length) + '. Bajá el Excel para verlos todos.</div>' : '') + '</div></details>';
+    }).join('') : '<div class="vacio"><span class="grande">✅</span>Sin problemas' + (S.calHoja ? ' en esta planilla' : '') + '</div>';
+    html += '</div></article>';
     $('#calidad').innerHTML = html;
+    $('#cHojas').onclick = function (e) { var b = e.target.closest('[data-h]'); if (b) { S.calHoja = b.dataset.h; pintarCalidad(); } };
     $('#cExcel').onclick = function () {
-      exportarExcel('SAE Entregas - calidad de datos', [
-        { nombre: 'Fuera de la base', titulo: 'Instituciones que no están en ESTABLECIMIENTOS', subtitulo: 'Descargado el ' + hoy(), columnas: [{ t: 'Nombre', ancho: 30 }, { t: 'Entregas' }, { t: 'Obras' }, { t: 'Arreglos' }, { t: 'Escrita como', ancho: 50 }],
-          filas: fuera.map(function (i) { return [i.id, i.E, i.O, i.A, (i.alias || []).join(' · ')]; }) },
-        { nombre: 'Nombres unificados', titulo: 'Nombres unificados', columnas: [{ t: 'Queda como', ancho: 30 }, { t: 'Aparecía como', ancho: 60 }], filas: conAlias.map(function (i) { return [i.id, i.alias.join(' · ')]; }) },
-        { nombre: 'Avisos', titulo: 'Avisos por planilla', columnas: [{ t: 'Planilla', ancho: 26 }, { t: 'Fila', ancho: 8 }, { t: 'Aviso', ancho: 90 }], filas: Datos.avisos.map(function (a) { return [a.hoja, a.fila, a.texto]; }) }
-      ]);
+      exportarExcel('SAE Entregas - calidad de datos', [{ nombre: 'Para revisar', titulo: 'Calidad de datos · para revisar', subtitulo: (S.calHoja ? U.nombreHoja(S.calHoja) + ' · ' : '') + 'descargado el ' + hoy(),
+        columnas: [{ t: 'Problema', ancho: 34 }, { t: 'Planilla', ancho: 26 }, { t: 'Celda', ancho: 9 }, { t: 'Detalle', ancho: 90 }],
+        filas: U.sinAlFinal(PROBLEMAS.map(function (p) { return p; })).reduce(function (acc, p) {
+          return acc.concat(Lf.filter(function (x) { return x.tipo === p[0]; }).map(function (x) { return [p[2], x.ref ? U.nombreHoja(x.ref[0]) : (x.hojaNom || ''), x.ref ? U.celdaTexto(x.ref) : (x.fila || ''), x.texto]; }));
+        }, []) }]);
     };
   }
 
@@ -508,7 +606,11 @@
     leerUrl();
     $$('#nav button').forEach(function (b) { b.onclick = function () { irA(b.dataset.vista, true); }; });
     // links a fichas desde cualquier tabla
-    document.addEventListener('click', function (e) { var a = e.target.closest('[data-inst]'); if (a) { e.preventDefault(); abrirFicha(a.dataset.inst); } });
+    document.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-ref]');
+      if (b) { e.preventDefault(); var p = b.dataset.ref.split('|'); U.abrirCelda([p[0], +p[1], +p[2]]); return; }
+      var a = e.target.closest('[data-inst]'); if (a) { e.preventDefault(); abrirFicha(a.dataset.inst); }
+    });
 
     var q = $('#q');
     q.addEventListener('input', U.debounce(function () { pintarSug(); pintarLista(); }, 120));
@@ -544,7 +646,7 @@
       $(p[0]).addEventListener('change', function () { S.g[p[1]] = this.value; pintarGeneral(); });
     });
     $('#gMedida').addEventListener('click', function (e) { var b = e.target.closest('[data-m]'); if (b) { S.g.medida = b.dataset.m; pintarGeneral(); } });
-    $('#gRankModo').addEventListener('click', function (e) { var b = e.target.closest('[data-m]'); if (b) { S.g.rank = b.dataset.m; pintarGeneral(); } });
+    $('#gRankModo').addEventListener('click', function (e) { var b = e.target.closest('[data-m]'); if (b) { S.g.rank = b.dataset.m; S.g.rankTodas = false; pintarGeneral(); } });
     $('#gCalorN').addEventListener('change', function () { S.g.calorN = +this.value; pintarCalor(filtrarGeneral()); });
     $('#gLimpiar').onclick = function () { var m = S.g.medida; S.g = { tipos: new Set(TIPOS), anios: new Set(), cat: '', nivel: '', gestion: '', localidad: '', prov: '', medida: m, rank: 'mas', calorN: S.g.calorN }; pintarGeneral(); };
     $('#gCalorExcel').onclick = function () {
@@ -576,9 +678,9 @@
     // Selectores del buscador (se llenan cuando llegan los datos)
     Datos.alCambiar(function () {
       var insts = Array.from(Datos.inst.values());
-      U.opciones($('#bNivel'), valores(insts, function (i) { return i.nivel; }).sort(ordenEs), 'Todos', $('#bNivel').value);
-      U.opciones($('#bGestion'), valores(insts, function (i) { return i.gestion; }).sort(ordenEs), 'Todas', $('#bGestion').value);
-      U.opciones($('#bLocalidad'), valores(insts, function (i) { return i.localidad; }).sort(ordenEs), 'Todas', $('#bLocalidad').value);
+      U.opciones($('#bNivel'), valores(insts, function (i) { return i.nivel; }).sort(U.ordenTexto), 'Todos', $('#bNivel').value);
+      U.opciones($('#bGestion'), valores(insts, function (i) { return i.gestion; }).sort(U.ordenTexto), 'Todas', $('#bGestion').value);
+      U.opciones($('#bLocalidad'), valores(insts, function (i) { return i.localidad; }).sort(U.ordenTexto), 'Todas', $('#bLocalidad').value);
       pintar();
     });
     U.opciones($('#bNivel'), [], 'Todos'); U.opciones($('#bGestion'), [], 'Todas'); U.opciones($('#bLocalidad'), [], 'Todas');

@@ -11,7 +11,7 @@
  * (Implementar → Administrar implementaciones → editar → Nueva versión).
  */
 
-var VERSION_SCRIPT = '1.0.0';
+var VERSION_SCRIPT = '1.1.0';
 
 // ─────────────────────────────── Planillas ───────────────────────────────
 var PLANILLAS = {
@@ -20,13 +20,14 @@ var PLANILLAS = {
   facturacion: '1mku6iQQSy2Vjfa51QhXJ_WUMphHIlT3yYvMdB3baiIc'  // Facturación SAE 2026
 };
 
+// cod: código corto que viaja en cada registro para poder abrir la planilla justo en esa celda
 var HOJAS = {
-  establecimientos: { planilla: 'baseDatos',   hoja: 'ESTABLECIMIENTOS' },
-  entregas:         { planilla: 'baseDatos',   hoja: 'ENTREGAS' },
-  obras:            { planilla: 'baseDatos',   hoja: 'OBRAS-INFRAESTRUCTURA' },
-  historico:        { planilla: 'tablero',     hoja: 'HISTORICOENTREGAS' },
-  items:            { planilla: 'facturacion', hoja: 'FACTURACION ITEMS' },
-  unidades:         { planilla: 'facturacion', hoja: 'FACTURACION UNIDADES' }
+  establecimientos: { planilla: 'baseDatos',   hoja: 'ESTABLECIMIENTOS',      cod: 'ES' },
+  entregas:         { planilla: 'baseDatos',   hoja: 'ENTREGAS',              cod: 'EN' },
+  obras:            { planilla: 'baseDatos',   hoja: 'OBRAS-INFRAESTRUCTURA', cod: 'OB' },
+  historico:        { planilla: 'tablero',     hoja: 'HISTORICOENTREGAS',     cod: 'HI' },
+  items:            { planilla: 'facturacion', hoja: 'FACTURACION ITEMS',     cod: 'IT' },
+  unidades:         { planilla: 'facturacion', hoja: 'FACTURACION UNIDADES',  cod: 'UN' }
 };
 
 // Montos y N° de factura: se dejan preparados pero APAGADOS. Cuando el equipo decida
@@ -83,12 +84,13 @@ function json_(o) {
 }
 
 function leerHojas_() {
-  var abiertas = {}, out = {};
+  var abiertas = {}, out = { meta: {} };
   Object.keys(HOJAS).forEach(function (k) {
     var h = HOJAS[k];
     var ss = abiertas[h.planilla] || (abiertas[h.planilla] = SpreadsheetApp.openById(PLANILLAS[h.planilla]));
     var sh = ss.getSheetByName(h.hoja);
     out[k] = sh ? sh.getDataRange().getValues() : null;
+    out.meta[h.cod] = { id: PLANILLAS[h.planilla], gid: sh ? sh.getSheetId() : null, hoja: h.hoja, planilla: ss.getName() };
   });
   out.zona = Session.getScriptTimeZone() || 'America/Argentina/Buenos_Aires';
   return out;
@@ -121,25 +123,27 @@ function leerCache_() {
 /**
  * Registro (array, para que pese poco):
  * [0 tipo 'E'|'O'|'A', 1 año, 2 fecha 'AAAA-MM-DD' o '', 3 id institución, 4 categoría, 5 detalle,
- *  6 cantidad, 7 proveedor, 8 fuente, 9 servicio/OC, 10 estado, 11 monto (null si apagado), 12 factura (null)]
+ *  6 cantidad, 7 proveedor, 8 fuente, 9 servicio/OC, 10 estado, 11 monto (null si apagado), 12 factura (null),
+ *  13 hoja (ES/EN/OB/HI/IT/UN), 14 fila, 15 columna]  ← celda de origen, para el botón ↗ de la página
  */
 function construirDatos(h) {
   var zona = h.zona || 'America/Argentina/Buenos_Aires';
-  var ctx = { inst: {}, avisos: [], zona: zona, registros: [] };
+  var ctx = { inst: {}, avisos: [], zona: zona, registros: [], h: '' };
 
-  cargarEstablecimientos_(h.establecimientos, ctx);
-  if (h.entregas) leerEntregas_(h.entregas, ctx);
-  if (h.historico) leerHistorico_(h.historico, ctx);
-  if (h.unidades) leerUnidades_(h.unidades, ctx);
-  if (h.obras) leerObras_(h.obras, ctx);
-  if (h.items) leerItems_(h.items, ctx);
+  ctx.h = 'ES'; cargarEstablecimientos_(h.establecimientos, ctx);
+  [['entregas', 'EN', leerEntregas_], ['historico', 'HI', leerHistorico_], ['unidades', 'UN', leerUnidades_],
+   ['obras', 'OB', leerObras_], ['items', 'IT', leerItems_]].forEach(function (x) {
+    ctx.h = x[1];
+    if (h[x[0]]) x[2](h[x[0]], ctx); else aviso_(ctx, 'hoja', 0, 0, 'No se pudo leer la hoja');
+  });
 
   // Instituciones con movimientos (más las de la base aunque no tengan nada, para poder buscarlas)
   var lista = Object.keys(ctx.inst).map(function (id) {
     var i = ctx.inst[id];
     return { id: id, nombre: i.nombre, completo: i.completo || '', gestion: i.gestion || '', tipo: i.tipo || '',
       nivel: i.nivel || '', cue: i.cue || '', matricula: i.matricula || 0, servicio: i.servicio || '',
-      localidad: i.localidad || '', enBase: !!i.enBase, alias: i.alias ? Object.keys(i.alias) : [] };
+      localidad: i.localidad || '', enBase: !!i.enBase, ref: i.ref || null,
+      alias: i.alias ? Object.keys(i.alias) : [], aliasRef: i.alias || {} };
   }).sort(function (a, b) { return a.id < b.id ? -1 : 1; });
 
   var res = { E: 0, O: 0, A: 0 };
@@ -151,6 +155,7 @@ function construirDatos(h) {
     generado: new Date().toISOString(),
     montos: INCLUIR_MONTOS,
     resumen: { entregas: res.E, obras: res.O, arreglos: res.A, instituciones: lista.length },
+    hojas: h.meta || {},
     instituciones: lista,
     registros: ctx.registros,
     avisos: ctx.avisos.slice(0, 1500)
@@ -171,7 +176,11 @@ function titulo_(s) {
   s = txt_(s).toLowerCase();
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
-function aviso_(ctx, hoja, fila, texto) { ctx.avisos.push({ hoja: hoja, fila: fila, texto: texto }); }
+/** Aviso para la pestaña Calidad de datos. tipo: sin_inst | sin_tipo | otra_inst | repetida | sin_datos | hoja */
+function aviso_(ctx, tipo, fila, col, texto) {
+  var nom = ''; for (var k in HOJAS) if (HOJAS[k].cod === ctx.h) nom = HOJAS[k].hoja;
+  ctx.avisos.push({ tipo: tipo, h: ctx.h, hoja: nom, fila: fila, col: col, texto: texto });
+}
 
 function pad2_(n) { n = String(Number(n)); return n.length < 2 ? '0' + n : n; }
 
@@ -214,13 +223,16 @@ function idInst_(v) {
   return s;
 }
 
-function inst_(ctx, nombre) {
+/** fila y col (desde 1) = celda donde aparece el nombre, para poder ir a revisarla */
+function inst_(ctx, nombre, fila, col) {
   var id = idInst_(nombre);
   if (!id) return '';
+  var ref = [ctx.h, fila || 0, col || 0];
   var i = ctx.inst[id];
   if (!i) i = ctx.inst[id] = { nombre: txt_(nombre), alias: {} };
+  if (!i.ref) i.ref = ref;
   var crudo = txt_(nombre);
-  if (clave_(crudo) !== id) i.alias[crudo] = 1;
+  if (clave_(crudo) !== id && !i.alias[crudo]) i.alias[crudo] = ref;
   return id;
 }
 
@@ -236,14 +248,16 @@ function cols_(cab, nombres, porDefecto) {
   return porDefecto == null ? -1 : porDefecto;
 }
 
-function reg_(ctx, r) {
+/** [13] hoja, [14] fila, [15] columna: celda a la que lleva el botón ↗ de la página */
+function reg_(ctx, r, fila, col) {
   if (!INCLUIR_MONTOS) { r[11] = null; r[12] = null; }
+  r[13] = ctx.h; r[14] = fila; r[15] = col;
   ctx.registros.push(r);
 }
 
 // ── ESTABLECIMIENTOS (BASE DE DATOS)
 function cargarEstablecimientos_(t, ctx) {
-  if (!t || !t.length) { aviso_(ctx, 'ESTABLECIMIENTOS', 0, 'No se pudo leer la hoja'); return; }
+  if (!t || !t.length) { aviso_(ctx, 'hoja', 0, 0, 'No se pudo leer la hoja'); return; }
   var c = t[0];
   var C = {
     inst: cols_(c, ['INSTITUCION'], 0), comp: cols_(c, ['NOMBRE COMPLETO INSTITUCION'], 1),
@@ -257,9 +271,9 @@ function cargarEstablecimientos_(t, ctx) {
     if (!nombre) continue;
     var id = idInst_(nombre);
     var i = ctx.inst[id];
-    if (i && i.enBase) { aviso_(ctx, 'ESTABLECIMIENTOS', f + 1, 'Institución repetida: ' + nombre); continue; }
+    if (i && i.enBase) { aviso_(ctx, 'repetida', f + 1, C.inst + 1, 'Institución repetida: ' + nombre); continue; }
     i = ctx.inst[id] = i || { alias: {} };
-    i.nombre = nombre; i.enBase = true;
+    i.nombre = nombre; i.enBase = true; i.ref = ['ES', f + 1, C.inst + 1];
     i.completo = txt_(row[C.comp]); i.gestion = txt_(row[C.gest]); i.tipo = txt_(row[C.tipo]);
     i.nivel = txt_(row[C.nivel]); i.cue = txt_(row[C.cue]); i.matricula = num_(row[C.mat]) || 0;
     i.servicio = txt_(row[C.serv]); i.localidad = txt_(row[C.loc]);
@@ -285,11 +299,11 @@ function leerEntregas_(t, ctx) {
     var row = t[f];
     if (!txt_(row[C.inst]) && !txt_(row[C.det])) continue;
     var fecha = fecha_(row[C.fecha], ctx.zona);
-    var id = inst_(ctx, row[C.inst]);
-    if (!id) { aviso_(ctx, 'ENTREGAS', f + 1, 'Fila sin institución'); continue; }
+    var id = inst_(ctx, row[C.inst], f + 1, C.inst + 1);
+    if (!id) { aviso_(ctx, 'sin_inst', f + 1, C.inst + 1, 'Entrega sin institución: ' + txt_(row[C.det])); continue; }
     var est = titulo_(row[C.estado]) || 'Entregado';
     reg_(ctx, ['E', anio_(row[C.anio], fecha), fecha, id, catEntrega_(row[C.cat]), txt_(row[C.det]),
-      num_(row[C.cant]) || 0, '', 'ENTREGAS', '', est]);
+      num_(row[C.cant]) || 0, '', 'ENTREGAS', '', est], f + 1, C.det + 1);
   }
 }
 
@@ -297,7 +311,7 @@ function leerEntregas_(t, ctx) {
 function leerHistorico_(t, ctx) {
   var c = t[0];
   var ids = [];
-  for (var j = 3; j < c.length; j++) ids[j] = txt_(c[j]) ? inst_(ctx, c[j]) : '';
+  for (var j = 3; j < c.length; j++) ids[j] = txt_(c[j]) ? inst_(ctx, c[j], 1, j + 1) : '';
   for (var f = 1; f < t.length; f++) {
     var row = t[f];
     var anio = anio_(row[0]); var det = txt_(row[2]);
@@ -311,7 +325,7 @@ function leerHistorico_(t, ctx) {
       if (n === 0) continue;
       var detalle = det;
       if (n == null) { detalle = det + ' · ' + txt_(v); n = 1; }   // texto en vez de número
-      reg_(ctx, ['E', anio, '', ids[k], cat, titulo_(detalle), n, '', 'HISTORICOENTREGAS', '', 'Entregado']);
+      reg_(ctx, ['E', anio, '', ids[k], cat, titulo_(detalle), n, '', 'HISTORICOENTREGAS', '', 'Entregado'], f + 1, k + 1);
     }
   }
 }
@@ -332,11 +346,11 @@ function leerUnidades_(t, ctx) {
     var cant = num_(row[C.cant]);
     if (!cant) continue;                                     // filas en 0 o vacías (ajustes)
     var destino = txt_(row[C.obs]);
-    if (!destino) { aviso_(ctx, 'FACTURACION UNIDADES', f + 1, 'Sin institución en OBSERVACIONES: ' + txt_(row[C.det])); continue; }
+    if (!destino) { aviso_(ctx, 'sin_inst', f + 1, C.obs + 1, 'Sin institución en OBSERVACIONES: ' + txt_(row[C.det])); continue; }
     var fecha = fecha_(row[C.fecha], ctx.zona);
-    reg_(ctx, [regla.tipo, anio_(null, fecha) || anio_(row[C.serv]), fecha, inst_(ctx, destino), regla.categoria,
+    reg_(ctx, [regla.tipo, anio_(null, fecha) || anio_(row[C.serv]), fecha, inst_(ctx, destino, f + 1, C.obs + 1), regla.categoria,
       txt_(row[C.det]), cant, limpiarProv_(row[C.prov]), 'FACTURACION UNIDADES', txt_(row[C.serv]), 'Entregado',
-      num_(row[C.monto]), txt_(row[C.fact])]);
+      num_(row[C.monto]), txt_(row[C.fact])], f + 1, C.det + 1);
   }
 }
 
@@ -357,11 +371,11 @@ function leerItems_(t, ctx) {
     var row = t[f];
     var esc = txt_(row[C.esc]), det = txt_(row[C.det]);
     if (!esc && !det) continue;
-    if (!esc) { aviso_(ctx, 'FACTURACION ITEMS', f + 1, 'Arreglo sin escuela: ' + det); continue; }
+    if (!esc) { aviso_(ctx, 'sin_inst', f + 1, C.esc + 1, 'Arreglo sin escuela: ' + det); continue; }
     var fecha = fecha_(row[C.fecha], ctx.zona);
-    reg_(ctx, ['A', anio_(null, fecha) || anio_(row[C.serv]), fecha, inst_(ctx, esc), rubro_(row[C.serv]), det,
+    reg_(ctx, ['A', anio_(null, fecha) || anio_(row[C.serv]), fecha, inst_(ctx, esc, f + 1, C.esc + 1), rubro_(row[C.serv]), det,
       num_(row[C.cant]) || 1, limpiarProv_(row[C.prov]), 'FACTURACION ITEMS', 'OC ' + txt_(row[C.oc]) + ' · ítem ' + txt_(row[C.item]),
-      'Facturado', num_(row[C.monto]), txt_(row[C.fact])]);
+      'Facturado', num_(row[C.monto]), txt_(row[C.fact])], f + 1, C.det + 1);
   }
 }
 
@@ -373,25 +387,25 @@ function leerObras_(t, ctx) {
   for (var f = 1; f < t.length; f++) {
     var row = t[f];
     var nombre = txt_(row[C.inst]);
-    if (!nombre) { if (txt_(row[C.det])) aviso_(ctx, 'OBRAS-INFRAESTRUCTURA', f + 1, 'Obra sin institución'); continue; }
+    if (!nombre) { if (txt_(row[C.det])) aviso_(ctx, 'sin_inst', f + 1, C.inst + 1, 'Obra sin institución: ' + txt_(row[C.det])); continue; }
     var anio = anio_(row[C.anio]);
-    var id = inst_(ctx, nombre);
-    if (id === 'SIN DATOS') { aviso_(ctx, 'OBRAS-INFRAESTRUCTURA', f + 1, 'Obra con institución "SIN DATOS"'); }
+    var id = inst_(ctx, nombre, f + 1, C.inst + 1);
+    if (id === 'SIN DATOS') { aviso_(ctx, 'sin_datos', f + 1, C.inst + 1, 'Obra cargada con institución "SIN DATOS" (' + (anio || 's/a') + ')'); }
     var tipo = txt_(row[C.tipo]) ? titulo_(row[C.tipo]) : 'Sin tipo';
-    if (tipo === 'Sin tipo') aviso_(ctx, 'OBRAS-INFRAESTRUCTURA', f + 1, 'Obra sin tipo: ' + nombre + ' (' + (anio || 's/a') + ')');
+    if (tipo === 'Sin tipo') aviso_(ctx, 'sin_tipo', f + 1, C.tipo + 1, 'Obra sin tipo: ' + nombre + ' (' + (anio || 's/a') + ')');
     // "EP 07 | REFACCION DE COCINAS" → "Refacción de cocinas" (se saca el nombre de la escuela)
     var partes = txt_(row[C.det]).split('|').map(txt_).filter(String);
     var resto = [];
     partes.forEach(function (p) {
       var pid = idInst_(p);
       if (pid === id) return;
-      if (/^(EP|EES|EE|JI|TEC|CFI|JM)\s*\d+$/.test(pid) && pid !== id) aviso_(ctx, 'OBRAS-INFRAESTRUCTURA', f + 1,
+      if (/^(EP|EES|EE|JI|TEC|CFI|JM)\s*\d+$/.test(pid) && pid !== id) aviso_(ctx, 'otra_inst', f + 1, C.det + 1,
         'El detalle nombra otra institución (' + p + ') en una obra de ' + nombre);
       resto.push(p);
     });
     var det = resto.join(' · ');
     if (det && det === det.toUpperCase()) det = titulo_(det);
-    reg_(ctx, ['O', anio, '', id, tipo, det || tipo, num_(row[C.cant]) || 1, '', 'OBRAS-INFRAESTRUCTURA', '', 'Realizada']);
+    reg_(ctx, ['O', anio, '', id, tipo, det || tipo, num_(row[C.cant]) || 1, '', 'OBRAS-INFRAESTRUCTURA', '', 'Realizada'], f + 1, C.det + 1);
   }
 }
 

@@ -8,7 +8,7 @@ Lee (sin modificar) tres planillas de Google a través de un Apps Script propio.
 | 🔎 Buscador | Búsqueda por institución, ficha con indicadores, línea de tiempo, qué recibió y detalle completo (Excel e impresión) |
 | 📊 Vista general | Filtros combinables (tipo, años, categoría, nivel, gestión, localidad, proveedor) y gráficos; institución × categoría |
 | 📋 Registros | Todos los registros con búsqueda, orden y Excel |
-| 🩺 Calidad de datos | Instituciones que no están en ESTABLECIMIENTOS, nombres unificados y filas con problemas |
+| 🩺 Calidad de datos | Problemas agrupados por tipo, con botón **↗ Ir a la celda** que abre la planilla justo donde hay que revisar |
 
 ## De dónde salen los datos
 | Planilla | Hoja | Va como |
@@ -25,6 +25,10 @@ Lee (sin modificar) tres planillas de Google a través de un Apps Script propio.
   `config.js` (URL del script y versión), `datos.js` (carga y copia guardada), `app.js` (vistas), `graficos.js` (gráficos SVG sin librerías), `excel.js` (Excel sin librerías).
 - `apps-script/Codigo.gs` · el script que lee las planillas. Cómo publicarlo: `apps-script/PUBLICAR.md`.
 - `vercel.json` · encabezados de seguridad del kit. `AGENTS.md` · reglas del ecosistema.
+
+## Botones ↗ (abrir la planilla en la celda)
+Cada registro trae su hoja, fila y columna de origen (Apps Script 1.1.0 o más). Todos los clics de una misma planilla usan
+la misma pestaña del navegador. Si el navegador bloquea la ventana, hay que permitir las ventanas emergentes para la página.
 
 ## Probar en la compu
 Sin servidor no anda (el navegador bloquea `fetch` con doble clic). Desde la carpeta: `python -m http.server 8000` y abrir <http://localhost:8000>.
