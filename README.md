@@ -1,4 +1,4 @@
-# SAE Entregas · Tres de Febrero
+# Ficha Escuelas · Tres de Febrero
 
 Buscador y tablero de **entregas, obras y arreglos** de cada institución.
 Lee (sin modificar) tres planillas de Google a través de un Apps Script propio.

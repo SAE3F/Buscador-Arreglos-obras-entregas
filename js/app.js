@@ -1,4 +1,4 @@
-// SAE Entregas · interfaz
+// Ficha Escuelas · interfaz
 (function () {
   var $ = U.$, $$ = U.$$, esc = U.esc, n = U.n, T = U.TIPOS;
   var TIPOS = ['E', 'O', 'A'];
@@ -110,7 +110,7 @@
     if (S.vista === 'general') pintarGeneral();
     if (S.vista === 'registros') pintarRegistros();
     if (S.vista === 'calidad') pintarCalidad();
-    $('#pie').textContent = 'SAE Tres de Febrero · Entregas, obras y arreglos · versión ' + CONFIG.VERSION_PAGINA +
+    $('#pie').textContent = 'Ficha Escuelas · Tres de Febrero · Entregas, obras y arreglos · versión ' + CONFIG.VERSION_PAGINA +
       (Datos.meta ? ' · script ' + Datos.meta.version : '');
   }
   function esqueleto() {
@@ -187,7 +187,7 @@
     if (!q.trim()) { cerrarSug(); return; }
     box.innerHTML = sugLista.length ? sugLista.map(function (i, k) {
       return '<div class="sug" role="option" data-id="' + esc(i.id) + '" aria-selected="' + (k === sugIdx) + '"><div><div class="nom">' + esc(i.id) + '</div>' +
-        '<div class="det">' + esc([i.completo, i.nivel, i.localidad].filter(Boolean).join(' · ') || (i.enBase ? '' : 'No está en ESTABLECIMIENTOS')) + '</div></div>' +
+        '<div class="det">' + esc([i.completo, i.direccion, i.nivel, i.localidad].filter(Boolean).join(' · ') || (i.enBase ? '' : 'No está en ESTABLECIMIENTOS')) + '</div></div>' +
         '<div class="cuentas"><span title="Entregas">📦 ' + i.E + '</span><span title="Obras">🏗️ ' + i.O + '</span><span title="Arreglos">🛠️ ' + i.A + '</span></div></div>';
     }).join('') : '<div class="vacio">No encontré instituciones con “' + esc(q) + '”</div>';
     box.classList.remove('oculto'); $('#q').setAttribute('aria-expanded', 'true');
@@ -248,11 +248,23 @@
     var ult = regs[0];
     var esteAnio = regs.filter(function (r) { return r.anio === anioActual; }).length;
 
-    var etiq = [['Nivel', i.nivel], ['Gestión', i.gestion], ['Localidad', i.localidad], ['CUE', i.cue], ['Matrícula / cupo SAE', i.matricula ? n(i.matricula) : ''], ['Servicio SAE', i.servicio]]
-      .filter(function (e) { return e[1]; }).map(function (e) { return '<span class="etiqueta">' + e[0] + ': <b>' + esc(e[1]) + '</b></span>'; }).join('');
-    var alias = (i.alias || []).length ? '<div class="chico muted" style="margin-top:.5rem">También aparece escrita como: ' + i.alias.map(esc).join(' · ') + '</div>' : '';
+    var cargoTxt = i.cargo ? ' (' + i.cargo.charAt(0).toUpperCase() + i.cargo.slice(1).toLowerCase() + ')' : '';
+    var direcTxt = i.directora ? i.directora + cargoTxt : '';
+    var etiq = [
+      ['📍 Dirección', i.direccion, true],
+      ['👤 Directora', direcTxt, true],
+      ['🎓 Nivel', i.nivel],
+      ['🏛️ Gestión', i.gestion],
+      ['🗺️ Localidad', i.localidad],
+      ['🔢 CUE', i.cue],
+      ['👥 Matrícula / cupo SAE', i.matricula ? n(i.matricula) : ''],
+      ['🍽️ Servicio SAE', i.servicio]
+    ].filter(function (e) { return e[1]; }).map(function (e) {
+      return '<span class="etiqueta' + (e[2] ? ' destacada' : '') + '">' + e[0] + ': <b>' + esc(e[1]) + '</b></span>';
+    }).join('');
+    var alias = (i.alias || []).length ? '<div class="chico muted" style="margin-top:.65rem">También aparece escrita como: ' + i.alias.map(esc).join(' · ') + '</div>' : '';
 
-    var html = '<article class="card sec"><div class="card-body"><div class="ficha-cab"><div>' +
+    var html = '<article class="card sec"><div class="card-body"><div class="ficha-cab"><div class="ficha-info">' +
       '<h2>🏫 ' + esc(i.id) + '</h2><div class="completo">' + esc(i.completo || (i.enBase ? '' : 'No está en la hoja ESTABLECIMIENTOS')) + '</div>' +
       '<div class="etiquetas">' + etiq + '</div>' + alias + '</div>' +
       '<div class="fila no-print">' + menuPlanillas(i, regs) + '<button class="btn btn-secondary btn-sm" id="fLink">🔗 Copiar link</button><button class="btn btn-secondary btn-sm" id="fExcel">⬇️ Excel</button>' +
@@ -311,7 +323,7 @@
     $('#fPrint').onclick = function () { window.print(); };
     $('#fCerrar').onclick = function () { S.inst = null; guardarUrl(true); pintar(); };
     $('#fExcel').onclick = function () {
-      exportarExcel('SAE ' + i.id + ' - entregas obras arreglos', TIPOS.map(function (t) {
+      exportarExcel('Ficha Escuelas - ' + i.id + ' - entregas obras arreglos', TIPOS.map(function (t) {
         return { nombre: T[t].nombre, titulo: i.id + ' · ' + T[t].nombre, subtitulo: (i.completo || '') + ' · descargado el ' + hoy(), columnas: colsExcel(), filas: por[t].map(paraExcel) };
       }));
     };
@@ -588,7 +600,7 @@
     if ($('#gRankTodas')) $('#gRankTodas').onclick = function () { g.rankTodas = !g.rankTodas; pintarGeneral(); };
     if ($('#gRankExcel')) $('#gRankExcel').onclick = function () {
       var nom = { mas: 'con más', menos: 'con menos', sin: 'sin registros' }[g.rank];
-      exportarExcel('SAE Entregas - instituciones ' + nom, [{ nombre: 'Instituciones', titulo: 'Instituciones ' + nom + ' (' + med + ')', subtitulo: filtrosTexto() + ' · descargado el ' + hoy(),
+      exportarExcel('Ficha Escuelas - instituciones ' + nom, [{ nombre: 'Instituciones', titulo: 'Instituciones ' + nom + ' (' + med + ')', subtitulo: filtrosTexto() + ' · descargado el ' + hoy(),
         columnas: [{ t: 'Institución', ancho: 18 }, { t: 'Nombre completo', ancho: 40 }, { t: 'Nivel', ancho: 18 }, { t: 'Localidad', ancho: 18 }, { t: 'Gestión', ancho: 12 },
           { t: 'Entregas' }, { t: 'Obras' }, { t: 'Arreglos' }, { t: 'Total' }],
         filas: lista.map(function (o) { var i = Datos.inst.get(o.k) || {}; return [o.k, i.completo || '', i.nivel || '', i.localidad || '', i.gestion || '', o.E, o.O, o.A, o.total]; }) }]);
@@ -785,7 +797,7 @@
     $('#calidad').innerHTML = html;
     $('#cHojas').onclick = function (e) { var b = e.target.closest('[data-h]'); if (b) { S.calHoja = b.dataset.h; pintarCalidad(); } };
     $('#cExcel').onclick = function () {
-      exportarExcel('SAE Entregas - calidad de datos', [{ nombre: 'Para revisar', titulo: 'Calidad de datos · para revisar', subtitulo: (S.calHoja ? U.nombreHoja(S.calHoja) + ' · ' : '') + 'descargado el ' + hoy(),
+      exportarExcel('Ficha Escuelas - calidad de datos', [{ nombre: 'Para revisar', titulo: 'Calidad de datos · para revisar', subtitulo: (S.calHoja ? U.nombreHoja(S.calHoja) + ' · ' : '') + 'descargado el ' + hoy(),
         columnas: [{ t: 'Problema', ancho: 34 }, { t: 'Planilla', ancho: 26 }, { t: 'Celda', ancho: 9 }, { t: 'Detalle', ancho: 90 }],
         filas: U.sinAlFinal(PROBLEMAS.map(function (p) { return p; })).reduce(function (acc, p) {
           return acc.concat(Lf.filter(function (x) { return x.tipo === p[0]; }).map(function (x) { return [p[2], x.ref ? U.nombreHoja(x.ref[0]) : (x.hojaNom || ''), x.ref ? U.celdaTexto(x.ref) : (x.fila || ''), x.texto]; }));
@@ -823,7 +835,7 @@
     if ($('#bOrden').value) { var po = $('#bOrden').value.split('|'); S.lista = { col: po[0], dir: +po[1] }; }
     $('#btnExcelInst').onclick = function () {
       var arr = pintarLista.ultima || [];
-      exportarExcel('SAE Entregas - instituciones', [{ nombre: 'Instituciones', titulo: 'Instituciones · entregas, obras y arreglos', subtitulo: 'Descargado el ' + hoy(),
+      exportarExcel('Ficha Escuelas - instituciones', [{ nombre: 'Instituciones', titulo: 'Instituciones · entregas, obras y arreglos', subtitulo: 'Descargado el ' + hoy(),
         columnas: [{ t: 'Institución', ancho: 18 }, { t: 'Nombre completo', ancho: 40 }, { t: 'Nivel', ancho: 18 }, { t: 'Gestión', ancho: 12 }, { t: 'Localidad', ancho: 18 },
           { t: 'Entregas' }, { t: 'Unidades entregadas' }, { t: 'Obras' }, { t: 'Arreglos' }, { t: 'Último año', ancho: 10 }, { t: '¿En la base?', ancho: 11 }],
         filas: arr.map(function (i) { return [i.id, i.completo, i.nivel, i.gestion, i.localidad, i.E, i.uE, i.O, i.A, i.ultimoAnio || '', i.enBase ? 'Sí' : 'No']; }) }]);
@@ -849,7 +861,7 @@
     $('#gLimpiar').onclick = function () { var m = S.g.medida; S.g = { tipos: new Set(TIPOS), anios: new Set(), cat: '', nivel: '', gestion: '', localidad: '', prov: '', medida: m, rank: 'mas', calorN: S.g.calorN }; pintarGeneral(); };
     $('#gCalorExcel').onclick = function () {
       var d = pintarCalor.ultimo; if (!d) return;
-      exportarExcel('SAE Entregas - institucion x categoria', [{ nombre: 'Institución x categoría', titulo: 'Institución × categoría (' + (S.g.medida === 'uni' ? 'unidades' : 'registros') + ')',
+      exportarExcel('Ficha Escuelas - institucion x categoria', [{ nombre: 'Institución x categoría', titulo: 'Institución × categoría (' + (S.g.medida === 'uni' ? 'unidades' : 'registros') + ')',
         subtitulo: 'Descargado el ' + hoy(), columnas: [{ t: 'Institución', ancho: 18 }].concat(d.cats.map(function (c) { return { t: c, ancho: 12 }; }), [{ t: 'Total', ancho: 10 }]),
         filas: d.filas.map(function (f) { return [f.k].concat(d.cats.map(function (c) { return d.celdas.get(f.k + '|' + c) || 0; }), [f.total]); }) }]);
     };
@@ -861,7 +873,7 @@
     });
     $('#rExcel').onclick = function () {
       var rs = pintarRegistros.ultimos || [];
-      exportarExcel('SAE Entregas - registros', [{ nombre: 'Registros', titulo: 'Entregas, obras y arreglos', subtitulo: n(rs.length) + ' registros · descargado el ' + hoy(), columnas: colsExcel(), filas: rs.map(paraExcel) }]);
+      exportarExcel('Ficha Escuelas - registros', [{ nombre: 'Registros', titulo: 'Entregas, obras y arreglos', subtitulo: n(rs.length) + ' registros · descargado el ' + hoy(), columnas: colsExcel(), filas: rs.map(paraExcel) }]);
     };
 
     // Encabezado

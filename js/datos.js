@@ -3,11 +3,35 @@
   var C = window.CONFIG;
   var Datos = { listo: false, regs: [], inst: new Map(), avisos: [], hojas: {}, meta: null, oyentes: [] };
 
+  function normClave(s) {
+    return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/\s+/g, ' ').trim().replace(/^([A-Z]+)\s*0*(\d+)/, '$1 $2');
+  }
+  function buscarExtra(i) {
+    var ex = window.ESCUELAS_EXTRA;
+    if (!ex) return null;
+    return ex[normClave(i.id)] || ex[normClave(i.nombre)] || ex[normClave(i.completo)] || null;
+  }
+  function enriquecer(i) {
+    var ex = buscarExtra(i);
+    if (ex) {
+      i.direccion = i.direccion || ex.direccion || '';
+      i.directora = i.directora || ex.directora || '';
+      i.cargo = i.cargo || ex.cargo || '';
+      i.localidad = i.localidad || ex.localidad || '';
+      i.cue = i.cue || ex.cue || '';
+    } else {
+      i.direccion = i.direccion || '';
+      i.directora = i.directora || '';
+      i.cargo = i.cargo || '';
+    }
+    i.busca = U.norm([i.id, i.nombre, i.completo, i.localidad, i.direccion, i.directora].concat(i.alias || []).join(' '));
+  }
+
   function preparar(j) {
     var inst = new Map();
     (j.instituciones || []).forEach(function (i) {
       i.E = 0; i.O = 0; i.A = 0; i.uE = 0; i.ultimo = ''; i.ultimoAnio = 0;
-      i.busca = U.norm([i.id, i.nombre, i.completo, i.localidad].concat(i.alias || []).join(' '));
+      enriquecer(i);
       inst.set(i.id, i);
     });
     var regs = (j.registros || []).map(function (r, k) {
@@ -15,7 +39,7 @@
         cant: Number(r[6]) || 0, prov: r[7] || '', fuente: r[8] || '', serv: r[9] || '', estado: r[10] || '', monto: r[11], fact: r[12],
         ref: r[13] ? [r[13], r[14], r[15]] : null };
       var i = inst.get(o.inst);
-      if (!i) { i = { id: o.inst, nombre: o.inst, completo: '', nivel: '', gestion: '', localidad: '', enBase: false, alias: [], aliasRef: {}, ref: null, E: 0, O: 0, A: 0, uE: 0, ultimo: '', ultimoAnio: 0, busca: U.norm(o.inst) }; inst.set(o.inst, i); }
+      if (!i) { i = { id: o.inst, nombre: o.inst, completo: '', nivel: '', gestion: '', localidad: '', enBase: false, alias: [], aliasRef: {}, ref: null, E: 0, O: 0, A: 0, uE: 0, ultimo: '', ultimoAnio: 0 }; enriquecer(i); inst.set(o.inst, i); }
       o.I = i;
       i[o.t]++;
       if (o.t === 'E') i.uE += o.cant;
