@@ -212,3 +212,8 @@ html.dark .tabla-caja td.fuente { color: var(--text-secondary); }
   .card.achicada .card-body { display: block; }
 }
 .chip[aria-pressed="true"] .marca { box-shadow: 0 0 0 2px #fff; }
+
+/* Tablas de registros: columnas de ancho fijo y una sola línea por fila (el texto completo aparece al pasar el mouse) */
+.tabla-caja table.tabla-fija { table-layout: fixed; width: 100%; }
+.tabla-fija td, .tabla-fija th { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tabla-fija td { vertical-align: middle; height: 40px; }

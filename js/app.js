@@ -258,23 +258,28 @@
   /** Tabla de registros (ficha y vista Registros) */
   function tablaRegs(rs, conInst, orden) {
     var m = hayMontos();
+    // [clave, título, numérica, ancho en px (0 = el resto)] — anchos fijos: no cambian al filtrar
     var cols = [];
-    if (conInst) cols.push(['t', 'Tipo']);
-    cols.push(['orden', 'Fecha']);
-    if (conInst) cols.push(['inst', 'Institución']);
-    cols.push(['cat', 'Categoría'], ['det', 'Detalle'], ['cant', 'Cant.', 1], ['prov', 'Proveedor']);
-    if (m) cols.push(['monto', 'Monto', 1], ['fact', 'Factura']);
-    cols.push(['fuente', 'Planilla']);
-    return '<table><thead><tr>' + cols.map(function (c) {
+    if (conInst) cols.push(['t', 'Tipo', 0, 96]);
+    cols.push(['orden', 'Fecha', 0, 84]);
+    if (conInst) cols.push(['inst', 'Institución', 0, 150]);
+    cols.push(['cat', 'Categoría', 0, 158], ['det', 'Detalle', 0, 0], ['cant', 'Cant.', 1, 64], ['prov', 'Proveedor', 0, 170]);
+    if (m) cols.push(['monto', 'Monto', 1, 110], ['fact', 'Factura', 0, 90]);
+    cols.push(['fuente', 'Planilla', 0, 140]);
+    var minimo = cols.reduce(function (s, c) { return s + (c[3] || 260); }, 0);
+    function celda(clase, texto, html) { return '<td class="' + clase + '" title="' + esc(texto) + '">' + (html == null ? esc(texto) : html) + '</td>'; }
+    return '<table class="tabla-fija" style="min-width:' + minimo + 'px"><colgroup>' + cols.map(function (c) { return '<col' + (c[3] ? ' style="width:' + c[3] + 'px"' : '') + '>'; }).join('') +
+      '</colgroup><thead><tr>' + cols.map(function (c) {
       var o = orden && orden.col === c[0];
       return '<th class="' + (orden ? 'ord' : '') + (c[2] ? ' num' : '') + '" data-col="' + c[0] + '">' + c[1] + (o ? ' <span class="flecha">' + (orden.dir > 0 ? '▲' : '▼') + '</span>' : '') + '</th>';
     }).join('') + '</tr></thead><tbody>' + rs.map(function (r) {
-      return '<tr>' + (conInst ? '<td>' + etiquetaTipo(r.t) + '</td>' : '') + '<td class="fecha">' + fechaReg(r) + '</td>' +
-        (conInst ? '<td class="inst">' + linkInst(r.inst) + '</td>' : '') +
-        '<td>' + U.icono(r.cat) + ' ' + esc(r.cat) + '</td><td>' + esc(r.det) + (r.serv && r.t !== 'O' ? '<div class="chico muted">' + esc(r.serv) + '</div>' : '') + '</td>' +
-        '<td class="num">' + n(r.cant) + '</td><td class="chico">' + esc(r.prov) + '</td>' +
-        (m ? '<td class="num">' + (r.monto == null ? '' : '$ ' + n(r.monto)) + '</td><td class="chico">' + esc(r.fact || '') + '</td>' : '') +
-        '<td class="fuente">' + esc(r.fuente) + '</td></tr>';
+      var detTitulo = r.det + (r.serv && r.t !== 'O' ? ' — ' + r.serv : '');
+      return '<tr>' + (conInst ? celda('', T[r.t].uno, etiquetaTipo(r.t)) : '') + celda('fecha', String(fechaReg(r))) +
+        (conInst ? celda('inst', r.inst, linkInst(r.inst)) : '') +
+        celda('', r.cat, U.icono(r.cat) + '&nbsp;' + esc(r.cat)) + celda('', detTitulo, esc(r.det)) +
+        celda('num', n(r.cant)) + celda('chico', r.prov) +
+        (m ? celda('num', r.monto == null ? '' : '$ ' + n(r.monto)) + celda('chico', r.fact || '') : '') +
+        celda('fuente', r.fuente) + '</tr>';
     }).join('') + '</tbody></table>';
   }
 
