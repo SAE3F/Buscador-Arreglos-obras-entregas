@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <!-- GUARDIÁN SSO DEL PORTAL EDUCACIÓN 3F: todavía NO va (la página se suma al Portal más adelante).
+       Cuando la den de alta, pegar acá el bloque del guardián de la plantilla del kit (va primero en el <head>)
+       y poner el APP_ID que dé Matías. Ver README.md → "Sumar al Portal". -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SAE 3F · Entregas, obras y arreglos</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="icon" type="image/png" href="assets/logo_3f_chico.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/tokens-3f.css">
+  <link rel="stylesheet" href="css/app.css">
+  <script>
+    (function () {
+      var g = null; try { g = localStorage.getItem('modo-oscuro'); } catch (e) {}
+      var osc = g !== null ? g === 'true' : (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
+      if (osc) document.documentElement.classList.add('dark');
+    })();
+  </script>
+</head>
+<body>
+  <header class="app-header">
+    <div class="header-container">
+      <div class="brand">
+        <div class="brand-logo-3f"><img src="assets/logo_3f_96.png" alt="Municipalidad de Tres de Febrero" width="44" height="44"></div>
+        <div class="brand-text">
+          <h1>SAE <span class="highlight">Entregas</span></h1>
+          <div class="tagline">Entregas, obras y arreglos de cada institución</div>
+        </div>
+      </div>
+      <div class="header-acciones">
+        <span class="estado-datos" id="estadoDatos" title="Estado de los datos"><span class="punto"></span><span class="txt">Cargando…</span></span>
+        <button type="button" class="btn btn-secondary btn-sm" id="btnActualizar" title="Volver a leer las planillas">🔄 <span class="txt-largo">Actualizar</span></button>
+        <button type="button" class="btn btn-secondary btn-icono" id="btnModo" aria-label="Cambiar a modo oscuro" title="Modo oscuro">🌙</button>
+      </div>
+    </div>
+  </header>
+
+  <nav class="nav-wrap no-print" aria-label="Secciones">
+    <div class="pestanas" role="tablist" id="nav">
+      <button role="tab" data-vista="buscador" aria-selected="true">🔎 <span>Buscador</span></button>
+      <button role="tab" data-vista="general" aria-selected="false">📊 <span>Vista <span class="txt-largo">general</span></span></button>
+      <button role="tab" data-vista="registros" aria-selected="false">📋 <span>Registros</span> <span class="cuenta" id="cuentaRegistros"></span></button>
+      <button role="tab" data-vista="calidad" aria-selected="false">🩺 <span><span class="txt-largo">Calidad de </span>datos</span> <span class="cuenta" id="cuentaAvisos"></span></button>
+    </div>
+  </nav>
+
+  <main class="app-main" id="app">
+    <div id="avisoGlobal"></div>
+
+    <!-- ══════════ BUSCADOR ══════════ -->
+    <section id="vista-buscador" data-vista="buscador">
+      <article class="card">
+        <div class="card-body">
+          <div class="buscador">
+            <span class="lupa">🔎</span>
+            <input type="search" id="q" placeholder="Buscá una institución: EP 12, JI 921, Evita, Brighton…" autocomplete="off"
+              role="combobox" aria-expanded="false" aria-controls="sugerencias" aria-label="Buscar institución">
+            <div class="sugerencias oculto" id="sugerencias" role="listbox"></div>
+          </div>
+          <div class="filtros" style="margin-top:.8rem">
+            <div class="campo"><label for="bNivel">Nivel</label><select id="bNivel"></select></div>
+            <div class="campo"><label for="bGestion">Gestión</label><select id="bGestion"></select></div>
+            <div class="campo"><label for="bLocalidad">Localidad</label><select id="bLocalidad"></select></div>
+            <div class="campo"><label for="bSolo">Mostrar</label>
+              <select id="bSolo"><option value="mov">Con movimientos</option><option value="todas">Todas</option><option value="sin">Sin movimientos</option></select></div>
+          </div>
+        </div>
+      </article>
+
+      <div id="ficha"></div>
+
+      <article class="card" id="listaInst">
+        <div class="card-header">
+          <div><h2>🏫 Instituciones</h2><p class="card-subtitle" id="listaInstSub">Tocá una para ver su ficha completa</p></div>
+          <button type="button" class="btn btn-secondary btn-sm" id="btnExcelInst">⬇️ Excel</button>
+        </div>
+        <div class="card-body">
+          <div class="tabla-caja alto-max" id="tablaInst"></div>
+        </div>
+      </article>
+    </section>
+
+    <!-- ══════════ VISTA GENERAL ══════════ -->
+    <section id="vista-general" data-vista="general" class="oculto">
+      <article class="card">
+        <div class="card-header">
+          <div><h2>📊 Vista <span class="highlight">general</span></h2><p class="card-subtitle">Combiná filtros; todos los gráficos se actualizan juntos</p></div>
+          <button type="button" class="btn btn-secondary btn-sm" id="gLimpiar">✖ Limpiar filtros</button>
+        </div>
+        <div class="card-body">
+          <div class="filtros" style="margin-bottom:.7rem">
+            <div class="campo" style="min-width:auto"><label>Tipo</label><div class="chips" id="gTipos"></div></div>
+            <div class="campo" style="min-width:auto"><label>Medir por</label>
+              <div class="pestanas chicas" id="gMedida" role="tablist">
+                <button role="tab" data-m="reg" aria-selected="true">Registros</button><button role="tab" data-m="uni" aria-selected="false">Unidades</button>
+              </div></div>
+          </div>
+          <div class="campo" style="margin-bottom:.7rem"><label>Años</label><div class="chips" id="gAnios"></div></div>
+          <div class="filtros">
+            <div class="campo"><label for="gCat">Categoría / rubro</label><select id="gCat"></select></div>
+            <div class="campo"><label for="gNivel">Nivel</label><select id="gNivel"></select></div>
+            <div class="campo"><label for="gGestion">Gestión</label><select id="gGestion"></select></div>
+            <div class="campo"><label for="gLocalidad">Localidad</label><select id="gLocalidad"></select></div>
+            <div class="campo"><label for="gProv">Proveedor</label><select id="gProv"></select></div>
+          </div>
+        </div>
+      </article>
+
+      <div class="kpis" id="gKpis"></div>
+
+      <div class="grilla g2">
+        <article class="card"><div class="card-header"><div><h2>📈 Evolución por año</h2><p class="card-subtitle">Tocá un año para filtrar</p></div></div>
+          <div class="card-body"><div id="gAnual" class="graf"></div></div></article>
+        <article class="card"><div class="card-header"><div><h2>🗂️ Por categoría o rubro</h2><p class="card-subtitle">Tocá una para filtrar</p></div></div>
+          <div class="card-body"><div id="gCats"></div></div></article>
+        <article class="card"><div class="card-header"><div><h2>🏆 Instituciones</h2><p class="card-subtitle" id="gRankSub">Las que más recibieron</p></div>
+          <div class="pestanas chicas" id="gRankModo" role="tablist"><button role="tab" data-m="mas" aria-selected="true">Más</button><button role="tab" data-m="menos" aria-selected="false">Menos</button></div></div>
+          <div class="card-body"><div id="gRank"></div></div></article>
+        <article class="card"><div class="card-header"><div><h2>🚚 Por proveedor</h2><p class="card-subtitle">Entregas facturadas y arreglos</p></div></div>
+          <div class="card-body"><div id="gProvs"></div></div></article>
+        <article class="card"><div class="card-header"><div><h2>🎓 Por nivel</h2><p class="card-subtitle">Según ESTABLECIMIENTOS</p></div></div>
+          <div class="card-body"><div id="gNiveles"></div></div></article>
+        <article class="card"><div class="card-header"><div><h2>📍 Por localidad</h2><p class="card-subtitle">Según ESTABLECIMIENTOS</p></div></div>
+          <div class="card-body"><div id="gLocs"></div></div></article>
+      </div>
+
+      <article class="card">
+        <div class="card-header"><div><h2>🧩 Institución × categoría</h2><p class="card-subtitle">Más oscuro = más. Sirve para ver huecos (lo que una escuela nunca recibió)</p></div>
+          <div class="fila"><select id="gCalorN" aria-label="Cantidad de instituciones"><option value="25">25 instituciones</option><option value="50">50</option><option value="100">100</option><option value="9999">Todas</option></select>
+          <button type="button" class="btn btn-secondary btn-sm" id="gCalorExcel">⬇️ Excel</button></div></div>
+        <div class="card-body"><div class="tabla-caja alto-max calor" id="gCalor"></div></div>
+      </article>
+    </section>
+
+    <!-- ══════════ REGISTROS ══════════ -->
+    <section id="vista-registros" data-vista="registros" class="oculto">
+      <article class="card">
+        <div class="card-header">
+          <div><h2>📋 Todos los <span class="highlight">registros</span></h2><p class="card-subtitle" id="rSub"></p></div>
+          <button type="button" class="btn btn-primary btn-sm" id="rExcel">⬇️ Excel</button>
+        </div>
+        <div class="card-body">
+          <div class="filtros" style="margin-bottom:.9rem">
+            <div class="campo ancho"><label for="rTexto">Buscar</label><input type="search" id="rTexto" placeholder="Detalle, institución, proveedor… (ej. ventilador, EP 12)"></div>
+            <div class="campo"><label for="rTipo">Tipo</label><select id="rTipo"></select></div>
+            <div class="campo"><label for="rAnio">Año</label><select id="rAnio"></select></div>
+            <div class="campo"><label for="rCat">Categoría / rubro</label><select id="rCat"></select></div>
+            <div class="campo"><label for="rFuente">Planilla</label><select id="rFuente"></select></div>
+          </div>
+          <div class="tabla-caja" id="rTabla"></div>
+          <div class="paginas" id="rPaginas"></div>
+        </div>
+      </article>
+    </section>
+
+    <!-- ══════════ CALIDAD ══════════ -->
+    <section id="vista-calidad" data-vista="calidad" class="oculto">
+      <div id="calidad"></div>
+    </section>
+  </main>
+
+  <footer class="pie" id="pie">SAE Tres de Febrero · Entregas, obras y arreglos</footer>
+  <div class="toasts" id="toasts" aria-live="polite"></div>
+  <div class="tooltip oculto" id="tooltip" role="tooltip"></div>
+
+  <script src="js/config.js"></script>
+  <script src="js/util.js"></script>
+  <script src="js/excel.js"></script>
+  <script src="js/datos.js"></script>
+  <script src="js/graficos.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
