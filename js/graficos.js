@@ -28,7 +28,8 @@
     var n = o.cats.length;
     if (!n) { el.innerHTML = '<div class="vacio"><span class="grande">📭</span>Sin datos para estos filtros</div>'; return; }
     var tot = o.cats.map(function (_, i) { return o.series.reduce(function (s, se) { return s + (se.valores[i] || 0); }, 0); });
-    var max = niceMax(Math.max.apply(null, tot)), pw = W - ml - mr, ph = H - mt - mb;
+    var mx = Math.max.apply(null, tot), max = niceMax(mx), pw = W - ml - mr, ph = H - mt - mb;
+    if (max % 4 && max < 40) max = Math.max(4, Math.ceil(mx / 4) * 4);   // marcas enteras y parejas (0, 1, 2, 3, 4…)
     var banda = pw / n, bw = Math.min(56, Math.max(6, banda * 0.62));
     var y = function (v) { return mt + ph - (v / max) * ph; };
     var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + U.esc(o.aria || 'Gráfico de columnas') + '">';
@@ -89,7 +90,7 @@
     }).join('') + '</div>';
     U.$$('.bh', el).forEach(function (row) {
       var it = items[+row.dataset.i];
-      var html = '<div class="t">' + U.esc(it.titulo || it.lab.replace(/<[^>]+>/g, '')) + '</div>' + (it.sub ? '<div class="chico muted">' + U.esc(it.sub) + '</div>' : '') +
+      var html = it.tipHtml || '<div class="t">' + U.esc(it.titulo || it.lab.replace(/<[^>]+>/g, '')) + '</div>' + (it.sub ? '<div class="chico muted">' + U.esc(it.sub) + '</div>' : '') +
         (it.partes || []).filter(function (p) { return p.v > 0; }).map(function (p) { return filaTip('var(--c-' + p.t + ')', U.TIPOS[p.t].nombre, p.v); }).join('') +
         ((it.partes || []).length > 1 ? '<div class="r"><span>Total</span><b>' + U.n(it.total) + '</b></div>' : '');
       row.addEventListener('mousemove', function (ev) { G.mostrarTip(ev, html); });

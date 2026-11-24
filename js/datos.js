@@ -90,9 +90,13 @@
         if (!j || !j.ok) throw new Error((j && j.error) || 'Respuesta inválida del script');
         if (!esPrueba) guardarCopia(j);
         preparar(j); mostrarEstado(); avisoGlobal('');
-        if (j.version !== C.VERSION_SCRIPT_ESPERADA) {
-          avisoGlobal('⚠️ El Apps Script está en la versión <b>' + U.esc(j.version) + '</b> y esta página espera la <b>' + U.esc(C.VERSION_SCRIPT_ESPERADA) +
-            '</b>. Puede que falte volver a publicarlo (Implementar → Administrar implementaciones → Nueva versión).', 'naranja');
+        var cmp = compararVersion(j.version, C.VERSION_SCRIPT_ESPERADA);
+        if (cmp < 0) {
+          avisoGlobal('⚠️ <b>El Apps Script quedó atrasado:</b> está en la versión <b>' + U.esc(j.version) + '</b> y la página necesita la <b>' + U.esc(C.VERSION_SCRIPT_ESPERADA) +
+            '</b>. Pegá el <code>Codigo.gs</code> de esta actualización en script.google.com y publicalo (Implementar → Administrar implementaciones → ✏️ → Nueva versión).', 'naranja');
+        } else if (cmp > 0) {
+          avisoGlobal('⚠️ <b>La página quedó atrasada:</b> el Apps Script ya está en la versión <b>' + U.esc(j.version) + '</b> y estos archivos esperan la <b>' + U.esc(C.VERSION_SCRIPT_ESPERADA) +
+            '</b>. Subí los archivos de la última actualización de la página (incluido <code>js/version.js</code>).', 'naranja');
         }
         if (forzar) U.toast('✅ Datos actualizados');
       })
@@ -108,6 +112,11 @@
         }
       });
   };
+  function compararVersion(a, b) {
+    var x = String(a || '0').split('.').map(Number), y = String(b || '0').split('.').map(Number);
+    for (var i = 0; i < 3; i++) { var d = (x[i] || 0) - (y[i] || 0); if (d) return d < 0 ? -1 : 1; }
+    return 0;
+  }
   Datos.alCambiar = function (f) { Datos.oyentes.push(f); };
   setInterval(mostrarEstado, 60000);
   window.Datos = Datos;

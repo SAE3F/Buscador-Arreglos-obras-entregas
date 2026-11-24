@@ -22,7 +22,7 @@ Lee (sin modificar) tres planillas de Google a través de un Apps Script propio.
 
 ## Archivos
 - `index.html` · la página. `css/` estilos (`tokens-3f.css` es el del kit, sin cambios). `js/` lógica:
-  `config.js` (URL del script y versión), `datos.js` (carga y copia guardada), `app.js` (vistas), `graficos.js` (gráficos SVG sin librerías), `excel.js` (Excel sin librerías).
+  `config.js` (solo la URL del script: se completa una vez y no viene en las actualizaciones), `version.js` (versiones: viene en cada actualización), `datos.js` (carga y copia guardada), `app.js` (vistas), `graficos.js` (gráficos SVG sin librerías), `excel.js` (Excel sin librerías).
 - `apps-script/Codigo.gs` · el script que lee las planillas. Cómo publicarlo: `apps-script/PUBLICAR.md`.
 - `vercel.json` · encabezados de seguridad del kit. `AGENTS.md` · reglas del ecosistema.
 
@@ -34,7 +34,7 @@ la misma pestaña del navegador. Si el navegador bloquea la ventana, hay que per
 Sin servidor no anda (el navegador bloquea `fetch` con doble clic). Desde la carpeta: `python -m http.server 8000` y abrir <http://localhost:8000>.
 
 ## Versiones
-Página: `CONFIG.VERSION_PAGINA` (aparece abajo). Script: `VERSION_SCRIPT` en `Codigo.gs`; la página avisa si no coincide con `VERSION_SCRIPT_ESPERADA`.
+Página: `VERSION_PAGINA` en `js/version.js` (aparece abajo). Script: `VERSION_SCRIPT` en `Codigo.gs`. Si no coinciden con `VERSION_SCRIPT_ESPERADA`, la página avisa cuál de los dos quedó atrasado.
 
 ## Pendiente para más adelante
 - **Montos y N° de factura:** ya están preparados. Poner `INCLUIR_MONTOS = true` en `Codigo.gs` y publicar nueva versión: la página suma las columnas sola. Antes, sumar la página al Portal.

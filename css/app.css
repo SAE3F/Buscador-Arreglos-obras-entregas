@@ -250,3 +250,41 @@ html.dark .tabla-caja td.fuente { color: var(--text-secondary); }
 .aviso-fila a:hover { text-decoration: underline; }
 #gRank .tabla-caja table { min-width: 0; }
 @media print { .btn-ir, .menu-planillas, td.ir { display: none !important; } }
+
+/* ── v0.3.0 */
+/* Tabla institución × categoría: más compacta, Institución fija a la izquierda, Total a la derecha y encabezados arriba */
+.calor table { min-width: 0; width: max-content; border-collapse: separate; border-spacing: 0; }
+.calor th.rot { width: 38px; min-width: 38px; }
+.calor td.c { width: 38px; min-width: 38px; font-size: .74rem; padding: .4rem .1rem; }
+.calor thead th { position: sticky; top: 0; z-index: 3; background: var(--bg-card); }
+.calor th:first-child, .calor td.inst { position: sticky; left: 0; z-index: 2; background: var(--bg-card); min-width: 92px; max-width: 120px;
+  overflow: hidden; text-overflow: ellipsis; box-shadow: 1px 0 0 var(--border); }
+.calor th:last-child, .calor td:last-child { position: sticky; right: 0; z-index: 2; background: var(--bg-card); min-width: 58px; box-shadow: -1px 0 0 var(--border); }
+.calor thead th:first-child, .calor thead th:last-child { z-index: 4; }
+.calor tr:hover td.inst, .calor tr:hover td:last-child { background: var(--bg-subtle); }
+
+/* Proveedores */
+.bh .lab-sub { display: block; font-size: .72rem; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; }
+.info-prov { margin-top: .9rem; border: 1px solid var(--border); border-left: 4px solid var(--c-A); border-radius: 12px; padding: .8rem .9rem; background: var(--bg-subtle); font-size: .86rem; }
+.info-prov a { color: var(--primary); cursor: pointer; font-weight: 600; text-decoration: none; }
+.info-prov a:hover { text-decoration: underline; }
+
+/* Buscador: más filtros */
+.mas-filtros { margin-top: .7rem; border-top: 1px dashed var(--border); padding-top: .6rem; }
+.mas-filtros > summary { cursor: pointer; font-weight: 700; font-size: .86rem; color: var(--primary); list-style: none; display: inline-flex; gap: .4rem; align-items: center; }
+.mas-filtros > summary::-webkit-details-marker { display: none; }
+.mas-filtros .cuenta { font-size: .76rem; color: var(--accent-hover); }
+html.dark .mas-filtros .cuenta { color: var(--accent); }
+.check { display: inline-flex; align-items: center; gap: .45rem; font-size: .82rem; font-weight: 500; color: var(--text-secondary); cursor: pointer; text-transform: none; letter-spacing: 0; }
+.check input { width: 16px; height: 16px; min-height: 0; padding: 0; accent-color: var(--primary); }
+.campo input[type="month"], .campo input[type="date"] { min-width: 0; }
+select:disabled { opacity: .55; }
+
+/* Calidad: todo el aviso es clicable */
+.aviso-fila.click { cursor: pointer; transition: var(--transition); }
+.aviso-fila.click:hover, .aviso-fila.click:focus-visible { border-color: var(--primary); background: var(--primary-light); outline: none; }
+.aviso-fila .ver-ficha { font-weight: 600; }
+
+/* Copiar link (cuando el navegador no deja copiar solo) */
+.caja-copiar { position: fixed; inset: 0; z-index: 400; background: rgba(0, 13, 29, .45); display: flex; align-items: center; justify-content: center; padding: 1rem; }
+.caja-copiar .card { width: min(520px, 100%); margin: 0; }

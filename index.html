@@ -68,7 +68,28 @@
             <div class="campo"><label for="bLocalidad">Localidad</label><select id="bLocalidad"></select></div>
             <div class="campo"><label for="bSolo">Mostrar</label>
               <select id="bSolo"><option value="mov">Con movimientos</option><option value="todas">Todas</option><option value="sin">Sin movimientos</option></select></div>
+            <div class="campo"><label for="bOrden">Ordenar por</label>
+              <select id="bOrden"><option value="ultimo|-1">Último movimiento: más nuevo</option><option value="ultimo|1">Último movimiento: más viejo</option>
+                <option value="total|-1">Más registros</option><option value="total|1">Menos registros</option><option value="id|1">Nombre (A–Z)</option></select></div>
           </div>
+          <details class="mas-filtros" id="bMas">
+            <summary>➕ Más filtros <span class="cuenta" id="bMasCuenta"></span></summary>
+            <div class="filtros" style="margin-top:.7rem">
+              <div class="campo"><label for="bInactiva">Sin movimientos desde hace</label>
+                <select id="bInactiva"><option value="">—</option><option value="3">3 meses</option><option value="6">6 meses</option><option value="12">1 año</option><option value="24">2 años</option></select></div>
+              <div class="campo"><label for="bDesde">Con actividad desde</label><input type="month" id="bDesde"></div>
+              <div class="campo"><label for="bHasta">hasta</label><input type="month" id="bHasta"></div>
+              <div class="campo"><label for="bTieneModo">Categoría / rubro</label>
+                <div class="fila" style="gap:.4rem;flex-wrap:nowrap"><select id="bTieneModo" style="min-width:0"><option value="tiene">Tiene</option><option value="nunca">Nunca recibió</option></select>
+                <select id="bTieneCat" style="min-width:0;flex:1"></select></div></div>
+              <div class="campo"><label for="bProv">Proveedor</label><select id="bProv"></select></div>
+            </div>
+            <div class="fila" style="margin-top:.7rem;justify-content:space-between">
+              <label class="check"><input type="checkbox" id="bSinFecha" checked> Incluir registros sin fecha exacta (solo año)</label>
+            </div>
+          </details>
+          <div class="fila" style="margin-top:.6rem"><button type="button" class="btn btn-secondary btn-sm" id="bLimpiar">✖ Limpiar filtros</button>
+            <span class="chico muted">Los filtros del buscador se recuerdan en este navegador.</span></div>
         </div>
       </article>
 
@@ -122,7 +143,7 @@
           <div class="pestanas chicas" id="gRankModo" role="tablist"></div></div>
           <div class="card-body"><div id="gRank"></div><div class="fila mas-menos" id="gRankPie"></div></div></article>
         <article class="card"><div class="card-header"><div><h2>🚚 Por proveedor</h2><p class="card-subtitle">Entregas facturadas y arreglos</p></div></div>
-          <div class="card-body"><div id="gProvs"></div></div></article>
+          <div class="card-body"><div id="gProvs"></div><div id="gProvInfo"></div></div></article>
         <article class="card"><div class="card-header"><div><h2>🎓 Por nivel</h2><p class="card-subtitle">Según ESTABLECIMIENTOS</p></div></div>
           <div class="card-body"><div id="gNiveles"></div></div></article>
         <article class="card"><div class="card-header"><div><h2>📍 Por localidad</h2><p class="card-subtitle">Según ESTABLECIMIENTOS</p></div></div>
@@ -150,6 +171,7 @@
             <div class="campo"><label for="rTipo">Tipo</label><select id="rTipo"></select></div>
             <div class="campo"><label for="rAnio">Año</label><select id="rAnio"></select></div>
             <div class="campo"><label for="rCat">Categoría / rubro</label><select id="rCat"></select></div>
+            <div class="campo"><label for="rProv">Proveedor</label><select id="rProv"></select></div>
             <div class="campo"><label for="rFuente">Planilla</label><select id="rFuente"></select></div>
           </div>
           <div class="tabla-caja" id="rTabla"></div>
@@ -169,6 +191,7 @@
   <div class="tooltip oculto" id="tooltip" role="tooltip"></div>
 
   <script src="js/config.js"></script>
+  <script src="js/version.js"></script>
   <script src="js/util.js"></script>
   <script src="js/excel.js"></script>
   <script src="js/datos.js"></script>

@@ -6,11 +6,34 @@
 
   var S = {
     vista: 'buscador', inst: null,
-    ficha: { tab: 'E', anio: '', cat: '', q: '' },
-    lista: { col: 'total', dir: -1 },
+    ficha: fichaNueva('E'),
+    lista: { col: 'ultimo', dir: -1 },
     g: { tipos: new Set(TIPOS), anios: new Set(), cat: '', nivel: '', gestion: '', localidad: '', prov: '', medida: 'reg', rank: 'mas', calorN: 25 },
-    r: { q: '', tipo: '', anio: '', cat: '', fuente: '', col: 'orden', dir: -1, pag: 0 }
+    r: { q: '', tipo: '', anio: '', cat: '', prov: '', fuente: '', col: 'orden', dir: -1, pag: 0 }
   };
+  function fichaNueva(tab) {
+    return { tab: tab || 'E', anio: '', mes: '', cat: '', prov: '', q: '', periodo: '', desde: '', hasta: '', orden: 'nuevo', sinFecha: true, escala: 'anio', anioMes: '' };
+  }
+  var MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+  var MESES_CORTOS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+  var IDX = { porInst: new Map(), provs: new Map() };   // índices que se arman cuando llegan los datos
+
+  // ── fechas: los registros con solo año ("sin fecha exacta") entran por año si sinFecha está marcado
+  function iso(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  function rangoPeriodo(p, desde, hasta) {
+    var h = new Date(), y = h.getFullYear();
+    if (p === 'mes') return [iso(new Date(y, h.getMonth(), 1)), iso(h)];
+    if (p === '3m') return [iso(new Date(y, h.getMonth() - 3, h.getDate())), iso(h)];
+    if (p === 'anio') return [y + '-01-01', y + '-12-31'];
+    if (p === 'pasado') return [(y - 1) + '-01-01', (y - 1) + '-12-31'];
+    if (p === 'pers' && (desde || hasta)) return [desde || '0000-01-01', hasta || '9999-12-31'];
+    return null;
+  }
+  function enRango(r, rg, sinFecha) {
+    if (!rg) return true;
+    if (r.fecha) return r.fecha >= rg[0] && r.fecha <= rg[1];
+    return !!(sinFecha && r.anio && String(r.anio) >= rg[0].slice(0, 4) && String(r.anio) <= rg[1].slice(0, 4));
+  }
   var POR_PAGINA = 100;
 
   // ───────────────────────── helpers
@@ -71,7 +94,7 @@
   window.addEventListener('popstate', function () { leerUrl(); irA(S.vista, false); });
 
   function abrirFicha(id) {
-    S.inst = id; S.ficha = { tab: 'E', anio: '', cat: '', q: '' };
+    S.inst = id; S.ficha = fichaNueva('E');
     var i = Datos.inst.get(id); if (i && !i.E) S.ficha.tab = i.A ? 'A' : i.O ? 'O' : 'E';
     $('#q').value = ''; cerrarSug();
     irA('buscador', true);
@@ -96,14 +119,53 @@
 
   // ───────────────────────── BUSCADOR
   var sugIdx = -1, sugLista = [];
-  function filtroInstBuscador(i) {
-    var f = { nivel: $('#bNivel').value, gestion: $('#bGestion').value, loc: $('#bLocalidad').value, solo: $('#bSolo').value };
-    if (f.nivel && i.nivel !== f.nivel) return false;
-    if (f.gestion && i.gestion !== f.gestion) return false;
-    if (f.loc && i.localidad !== f.loc) return false;
+  var CAMPOS_B = ['bNivel', 'bGestion', 'bLocalidad', 'bSolo', 'bOrden', 'bInactiva', 'bDesde', 'bHasta', 'bTieneModo', 'bTieneCat', 'bProv', 'bSinFecha'];
+  var CLAVE_FILTROS = 'sae-entregas-filtros-buscador';
+  function leerFiltrosB() {
+    var f = {};
+    CAMPOS_B.forEach(function (k) { var el = $('#' + k); f[k] = el.type === 'checkbox' ? el.checked : el.value; });
+    return f;
+  }
+  function guardarFiltrosB() { try { localStorage.setItem(CLAVE_FILTROS, JSON.stringify(leerFiltrosB())); } catch (e) {} }
+  function restaurarFiltrosB() {
+    var f = null; try { f = JSON.parse(localStorage.getItem(CLAVE_FILTROS) || 'null'); } catch (e) {}
+    if (!f) return;
+    CAMPOS_B.forEach(function (k) {
+      var el = $('#' + k); if (!el || f[k] == null) return;
+      if (el.type === 'checkbox') el.checked = !!f[k];
+      else if (el.tagName !== 'SELECT' || Array.prototype.some.call(el.options, function (o) { return o.value === String(f[k]); })) el.value = f[k];
+      else el.dataset.pendiente = f[k];        // la opción todavía no existe (llega con los datos)
+    });
+  }
+  function limpiarFiltrosB() {
+    CAMPOS_B.forEach(function (k) { var el = $('#' + k); if (el.type === 'checkbox') el.checked = true; else el.value = ''; delete el.dataset.pendiente; });
+    $('#bSolo').value = 'mov'; $('#bOrden').value = 'ultimo|-1'; $('#bTieneModo').value = 'tiene';
+    S.lista = { col: 'ultimo', dir: -1 };
+    guardarFiltrosB(); pintarLista();
+  }
+  function finDeMes(ym) { var p = ym.split('-'); return iso(new Date(+p[0], +p[1], 0)); }
+  function filtroInstBuscador(i, f) {
+    if (f.bNivel && i.nivel !== f.bNivel) return false;
+    if (f.bGestion && i.gestion !== f.bGestion) return false;
+    if (f.bLocalidad && i.localidad !== f.bLocalidad) return false;
     var tot = i.E + i.O + i.A;
-    if (f.solo === 'mov' && !tot) return false;
-    if (f.solo === 'sin' && tot) return false;
+    if (f.bSolo === 'mov' && !tot) return false;
+    if (f.bSolo === 'sin' && tot) return false;
+    if (f.bInactiva) {
+      var h = new Date(), corte = iso(new Date(h.getFullYear(), h.getMonth() - Number(f.bInactiva), h.getDate()));
+      var ult = i.ultimo ? i.ultimo.replace(/-00-00$/, '-12-31') : '';
+      if (ult && ult >= corte) return false;
+    }
+    var regs = IDX.porInst.get(i.id) || [];
+    if (f.bDesde || f.bHasta) {
+      var rg = [f.bDesde ? f.bDesde + '-01' : '0000-01-01', f.bHasta ? finDeMes(f.bHasta) : '9999-12-31'];
+      if (!regs.some(function (r) { return enRango(r, rg, f.bSinFecha); })) return false;
+    }
+    if (f.bTieneCat) {
+      var tiene = regs.some(function (r) { return r.cat === f.bTieneCat; });
+      if ((f.bTieneModo === 'nunca') === tiene) return false;
+    }
+    if (f.bProv && !regs.some(function (r) { return r.prov === f.bProv; })) return false;
     return true;
   }
   function buscarInst(q) {
@@ -139,15 +201,19 @@
   }
 
   function pintarLista() {
-    var q = U.norm($('#q').value);
-    var arr = Array.from(Datos.inst.values()).filter(function (i) { return filtroInstBuscador(i) && (!q || q.split(' ').every(function (p) { return i.busca.indexOf(p) >= 0; })); });
+    var q = U.norm($('#q').value), f = leerFiltrosB();
+    var arr = Array.from(Datos.inst.values()).filter(function (i) { return filtroInstBuscador(i, f) && (!q || q.split(' ').every(function (p) { return i.busca.indexOf(p) >= 0; })); });
     arr.forEach(function (i) { i.total = i.E + i.O + i.A; });
     var col = S.lista.col, dir = S.lista.dir;
     arr.sort(function (a, b) {
       var va = a[col], vb = b[col];
       if (typeof va === 'number') return (va - vb) * dir || ordenEs(a.id, b.id);
-      return ordenEs(va || '', vb || '') * dir;
+      if (!va !== !vb) return va ? -1 : 1;           // sin fecha / vacío: siempre al final
+      return ordenEs(va || '', vb || '') * dir || ordenEs(a.id, b.id);
     });
+    var sel = col + '|' + dir; $('#bOrden').value = Array.prototype.some.call($('#bOrden').options, function (o) { return o.value === sel; }) ? sel : '';
+    var nMas = ['bInactiva', 'bDesde', 'bHasta', 'bTieneCat', 'bProv'].filter(function (k) { return f[k]; }).length;
+    $('#bMasCuenta').textContent = nMas ? nMas + ' activo' + (nMas > 1 ? 's' : '') : '';
     $('#listaInstSub').textContent = n(arr.length) + ' instituciones · tocá una para ver su ficha';
     var cols = [['id', 'Institución'], ['nivel', 'Nivel'], ['localidad', 'Localidad'], ['E', 'Entregas', 1], ['uE', 'Unidades', 1], ['O', 'Obras', 1], ['A', 'Arreglos', 1], ['ultimo', 'Último']];
     var vis = arr.slice(0, 400);
@@ -200,7 +266,10 @@
       (ult ? esc(T[ult.t].uno + ' · ' + ult.cat) : 'Sin registros') + '</div></div>' +
       '<div class="kpi"><div class="et">📅 En ' + anioActual + '</div><div class="val">' + n(esteAnio) + '</div><div class="sub">registros este año</div></div></div>';
 
-    html += '<div class="grilla g2"><article class="card"><div class="card-header"><div><h2>📈 Línea de tiempo</h2><p class="card-subtitle">Registros por año. Tocá un año para ver solo ese</p></div></div>' +
+    html += '<div class="grilla g2"><article class="card"><div class="card-header"><div><h2>📈 Línea de tiempo</h2><p class="card-subtitle" id="fAnualSub"></p></div>' +
+      '<div class="fila"><select id="fAnioMes" aria-label="Año a ver por mes" class="' + (S.ficha.escala === 'mes' ? '' : 'oculto') + '"></select>' +
+      '<div class="pestanas chicas" id="fEscala" role="tablist"><button role="tab" data-e="anio" aria-selected="' + (S.ficha.escala === 'anio') + '">Por año</button>' +
+      '<button role="tab" data-e="mes" aria-selected="' + (S.ficha.escala === 'mes') + '">Por mes</button></div></div></div>' +
       '<div class="card-body"><div class="graf" id="fAnual"></div></div></article>' +
       '<article class="card"><div class="card-header"><div><h2>🗂️ Qué recibió</h2><p class="card-subtitle">Por categoría o rubro (registros)</p></div></div><div class="card-body"><div id="fCats"></div></div></article></div>';
 
@@ -209,18 +278,22 @@
         return '<button role="tab" data-t="' + t + '" aria-selected="' + (S.ficha.tab === t) + '">' + T[t].icono + ' ' + T[t].nombre + ' <span class="cuenta">' + por[t].length + '</span></button>';
       }).join('') + '</div></div><div class="card-body"><div class="filtros" style="margin-bottom:.8rem">' +
       '<div class="campo ancho"><label for="fQ">Buscar en el detalle</label><input type="search" id="fQ" placeholder="ej. ventilador, termotanque" value="' + esc(S.ficha.q) + '"></div>' +
-      '<div class="campo"><label for="fAnio">Año</label><select id="fAnio"></select></div><div class="campo"><label for="fCat">Categoría / rubro</label><select id="fCat"></select></div></div>' +
+      '<div class="campo"><label for="fPeriodo">Período</label><select id="fPeriodo">' + [['', 'Todo'], ['mes', 'Este mes'], ['3m', 'Últimos 3 meses'], ['anio', 'Este año'], ['pasado', 'Año pasado'], ['pers', 'Elegir fechas…']].map(function (o) {
+        return '<option value="' + o[0] + '"' + (S.ficha.periodo === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></div>' +
+      '<div class="campo' + (S.ficha.periodo === 'pers' ? '' : ' oculto') + '" id="fFechas"><label>Desde / hasta</label><div class="fila" style="gap:.3rem;flex-wrap:nowrap">' +
+      '<input type="date" id="fDesde" value="' + esc(S.ficha.desde) + '" aria-label="Desde"><input type="date" id="fHasta" value="' + esc(S.ficha.hasta) + '" aria-label="Hasta"></div></div>' +
+      '<div class="campo"><label for="fAnio">Año</label><select id="fAnio"></select></div>' +
+      '<div class="campo"><label for="fMes">Mes</label><select id="fMes"></select></div>' +
+      '<div class="campo"><label for="fCat">Categoría / rubro</label><select id="fCat"></select></div>' +
+      '<div class="campo"><label for="fProv">Proveedor</label><select id="fProv"></select></div>' +
+      '<div class="campo"><label for="fOrden">Ordenar</label><select id="fOrden">' + [['nuevo', 'Más nuevo primero'], ['viejo', 'Más viejo primero'], ['cant', 'Mayor cantidad']].map(function (o) {
+        return '<option value="' + o[0] + '"' + (S.ficha.orden === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></div></div>' +
+      '<div class="fila" style="margin:-.2rem 0 .8rem;justify-content:space-between"><label class="check"><input type="checkbox" id="fSinFecha"' + (S.ficha.sinFecha ? ' checked' : '') +
+      '> Incluir registros sin fecha exacta (solo año)</label><button type="button" class="btn btn-secondary btn-sm" id="fLimpiar">✖ Limpiar filtros</button></div>' +
       '<div class="tabla-caja alto-max" id="fTabla"></div></div></article>';
     cont.innerHTML = html;
 
-    // Línea de tiempo
-    var anios = valores(regs, function (r) { return r.anio; }).sort();
-    if (anios.length) { var a0 = anios[0], a1 = Math.max(anios[anios.length - 1], a0); anios = []; for (var a = a0; a <= a1; a++) anios.push(a); }
-    G.columnas($('#fAnual'), {
-      cats: anios, aria: 'Registros por año de ' + i.id,
-      series: TIPOS.map(function (t) { return { id: t, nombre: T[t].nombre, color: 'var(--c-' + t + ')', valores: anios.map(function (a) { return por[t].filter(function (r) { return r.anio === a; }).length; }) }; }),
-      onClick: function (a) { S.ficha.anio = String(a); pintarTablaFicha(regs); U.toast('Año ' + a); $('#fTabla').scrollIntoView({ behavior: 'smooth', block: 'center' }); }
-    });
+    pintarLineaTiempo(i, regs, por);
     // Qué recibió
     var cats = new Map();
     regs.forEach(function (r) { var k = r.t + '|' + r.cat; var c = cats.get(k) || { t: r.t, cat: r.cat, reg: 0, cant: 0, ult: 0 }; c.reg++; c.cant += r.cant; c.ult = Math.max(c.ult, r.anio || 0); cats.set(k, c); });
@@ -231,7 +304,10 @@
     });
     G.barrasH($('#fCats'), citems, { vacio: 'Esta institución todavía no tiene registros' });
 
-    $('#fLink').onclick = function () { navigator.clipboard && navigator.clipboard.writeText(location.href).then(function () { U.toast('🔗 Link copiado'); }); };
+    $('#fLink').onclick = function () {
+      var u = location.origin + location.pathname + '?vista=buscador&inst=' + encodeURIComponent(i.id);
+      copiarTexto(u, '🔗 Link de ' + i.id + ' copiado');
+    };
     $('#fPrint').onclick = function () { window.print(); };
     $('#fCerrar').onclick = function () { S.inst = null; guardarUrl(true); pintar(); };
     $('#fExcel').onclick = function () {
@@ -241,8 +317,14 @@
     };
     $$('#fTabs button').forEach(function (b) { b.onclick = function () { S.ficha.tab = b.dataset.t; S.ficha.cat = ''; $$('#fTabs button').forEach(function (x) { x.setAttribute('aria-selected', String(x === b)); }); pintarTablaFicha(regs); }; });
     $('#fQ').oninput = U.debounce(function () { S.ficha.q = $('#fQ').value; pintarTablaFicha(regs); }, 150);
-    $('#fAnio').onchange = function () { S.ficha.anio = this.value; pintarTablaFicha(regs); };
-    $('#fCat').onchange = function () { S.ficha.cat = this.value; pintarTablaFicha(regs); };
+    [['#fAnio', 'anio'], ['#fMes', 'mes'], ['#fCat', 'cat'], ['#fProv', 'prov'], ['#fOrden', 'orden'], ['#fDesde', 'desde'], ['#fHasta', 'hasta']].forEach(function (x) {
+      $(x[0]).onchange = function () { S.ficha[x[1]] = this.value; pintarTablaFicha(regs); };
+    });
+    $('#fPeriodo').onchange = function () { S.ficha.periodo = this.value; $('#fFechas').classList.toggle('oculto', this.value !== 'pers'); pintarTablaFicha(regs); };
+    $('#fSinFecha').onchange = function () { S.ficha.sinFecha = this.checked; pintarTablaFicha(regs); };
+    $('#fLimpiar').onclick = function () { var t = S.ficha.tab, e = S.ficha.escala, am = S.ficha.anioMes; S.ficha = fichaNueva(t); S.ficha.escala = e; S.ficha.anioMes = am; pintarFicha(); };
+    $('#fEscala').onclick = function (ev) { var b = ev.target.closest('[data-e]'); if (!b) return; S.ficha.escala = b.dataset.e; pintarFicha(); };
+    $('#fAnioMes').onchange = function () { S.ficha.anioMes = this.value; pintarLineaTiempo(i, regs, por); };
     pintarTablaFicha(regs);
   }
   /** "📄 Ver en planillas": dónde aparece esta institución, con acceso directo a la primera fila de cada hoja */
@@ -273,17 +355,82 @@
     return Array.from(m.entries()).sort(function (a, b) { return b[1] - a[1]; }).slice(0, 2).map(function (e) { return e[0] + ' ' + e[1]; }).join(' · ');
   }
   function pintarTablaFicha(regs) {
-    var t = S.ficha.tab, base = regs.filter(function (r) { return r.t === t; });
-    U.opciones($('#fAnio'), valores(base, function (r) { return r.anio; }).sort().reverse(), 'Todos los años', S.ficha.anio);
-    U.opciones($('#fCat'), valores(base, function (r) { return r.cat; }).sort(U.ordenTexto), 'Todas', S.ficha.cat);
-    var q = U.norm(S.ficha.q);
+    var F = S.ficha, t = F.tab, base = regs.filter(function (r) { return r.t === t; });
+    U.opciones($('#fAnio'), valores(base, function (r) { return r.anio; }).sort().reverse(), 'Todos', F.anio);
+    U.opciones($('#fMes'), MESES.map(function (m, k) { return [String(k + 1).padStart(2, '0'), m]; }), 'Todos', F.mes);
+    U.opciones($('#fCat'), valores(base, function (r) { return r.cat; }).sort(U.ordenTexto), 'Todas', F.cat);
+    U.opciones($('#fProv'), valores(base, function (r) { return r.prov; }).sort(U.ordenTexto), 'Todos', F.prov);
+    $('#fProv').disabled = !$('#fProv').options[1];
+    var q = U.norm(F.q), rg = rangoPeriodo(F.periodo, F.desde, F.hasta), sinF = 0;
     var rs = base.filter(function (r) {
-      return (!S.ficha.anio || String(r.anio) === S.ficha.anio) && (!S.ficha.cat || r.cat === S.ficha.cat) && (!q || r.busca.indexOf(q) >= 0);
+      if (F.anio && String(r.anio) !== F.anio) return false;
+      if (F.mes) { if (r.fecha) { if (r.fecha.slice(5, 7) !== F.mes) return false; } else if (!F.sinFecha) return false; }
+      if (!enRango(r, rg, F.sinFecha)) return false;
+      if (F.cat && r.cat !== F.cat) return false;
+      if (F.prov && r.prov !== F.prov) return false;
+      if (q && r.busca.indexOf(q) < 0) return false;
+      if (!r.fecha && (F.mes || rg)) sinF++;
+      return true;
     });
+    if (F.orden === 'viejo') rs = rs.slice().reverse();
+    else if (F.orden === 'cant') rs = rs.slice().sort(function (a, b) { return b.cant - a.cant || (a.orden < b.orden ? 1 : -1); });
     var u = rs.reduce(function (s, r) { return s + r.cant; }, 0);
-    $('#fSub').textContent = n(rs.length) + ' ' + T[t].nombre.toLowerCase() + (t !== 'O' ? ' · ' + n(u) + ' unidades' : '') + (rs.length !== base.length ? ' (filtrado de ' + n(base.length) + ')' : '');
-    $$('.kpi[data-kpi]').forEach(function (k) { k.onclick = function () { S.ficha.tab = k.dataset.kpi; S.ficha.cat = ''; pintarFicha(); $('#fTabla').scrollIntoView({ behavior: 'smooth', block: 'center' }); }; });
+    $('#fSub').textContent = n(rs.length) + ' ' + T[t].nombre.toLowerCase() + (t !== 'O' ? ' · ' + n(u) + ' unidades' : '') + (rs.length !== base.length ? ' (filtrado de ' + n(base.length) + ')' : '') +
+      (sinF ? ' · ' + n(sinF) + ' sin fecha exacta incluidos por año' : '');
+    $$('.kpi[data-kpi]').forEach(function (k) { k.onclick = function () { S.ficha.tab = k.dataset.kpi; S.ficha.cat = ''; S.ficha.prov = ''; pintarFicha(); $('#fTabla').scrollIntoView({ behavior: 'smooth', block: 'center' }); }; });
     $('#fTabla').innerHTML = rs.length ? tablaRegs(rs, false) : '<div class="vacio"><span class="grande">' + T[t].icono + '</span>No hay ' + T[t].nombre.toLowerCase() + ' con estos filtros</div>';
+  }
+
+  /** Línea de tiempo de la ficha: por año (todo) o por mes (un año; solo registros con fecha exacta) */
+  function pintarLineaTiempo(i, regs, por) {
+    var F = S.ficha;
+    if (F.escala === 'mes') {
+      var conFecha = regs.filter(function (r) { return r.fecha; });
+      var anios = valores(conFecha, function (r) { return r.fecha.slice(0, 4); }).sort().reverse();
+      if (!F.anioMes || anios.indexOf(F.anioMes) < 0) F.anioMes = anios[0] || String(anioActual);
+      U.opciones($('#fAnioMes'), anios, anios.length ? '—' : 'Sin fechas', F.anioMes);
+      $('#fAnioMes').classList.remove('oculto');
+      var sinF = regs.filter(function (r) { return !r.fecha && String(r.anio) === F.anioMes; }).length;
+      $('#fAnualSub').textContent = 'Registros por mes en ' + F.anioMes + (sinF ? ' · ' + n(sinF) + ' de ese año no tienen fecha exacta y no se muestran' : '') + '. Tocá un mes para filtrar';
+      G.columnas($('#fAnual'), {
+        cats: MESES_CORTOS, aria: 'Registros por mes de ' + i.id,
+        series: TIPOS.map(function (t) { return { id: t, nombre: T[t].nombre, color: 'var(--c-' + t + ')', valores: MESES_CORTOS.map(function (_, k) {
+          var mm = F.anioMes + '-' + String(k + 1).padStart(2, '0'); return por[t].filter(function (r) { return r.fecha && r.fecha.slice(0, 7) === mm; }).length; }) }; }),
+        onClick: function (m, k) { S.ficha.anio = F.anioMes; S.ficha.mes = String(k + 1).padStart(2, '0'); pintarFicha(); U.toast(MESES[k] + ' ' + F.anioMes); $('#fTabla').scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+      });
+      return;
+    }
+    $('#fAnioMes').classList.add('oculto');
+    $('#fAnualSub').textContent = 'Registros por año. Tocá un año para ver solo ese';
+    var an = valores(regs, function (r) { return r.anio; }).sort();
+    if (an.length) { var a0 = an[0], a1 = an[an.length - 1]; an = []; for (var a = a0; a <= a1; a++) an.push(a); }
+    G.columnas($('#fAnual'), {
+      cats: an, aria: 'Registros por año de ' + i.id,
+      series: TIPOS.map(function (t) { return { id: t, nombre: T[t].nombre, color: 'var(--c-' + t + ')', valores: an.map(function (a) { return por[t].filter(function (r) { return r.anio === a; }).length; }) }; }),
+      onClick: function (a) { S.ficha.anio = String(a); S.ficha.mes = ''; pintarFicha(); U.toast('Año ' + a); $('#fTabla').scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+    });
+  }
+
+  /** Copiar al portapapeles con respaldo: API moderna → método viejo → cajita para copiar a mano */
+  function copiarTexto(texto, ok) {
+    function viejo() {
+      var ta = document.createElement('textarea'); ta.value = texto; ta.setAttribute('readonly', '');
+      ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;'; document.body.appendChild(ta); ta.select();
+      var hecho = false; try { hecho = document.execCommand('copy'); } catch (e) {}
+      ta.remove();
+      if (hecho) U.toast(ok); else cajaCopiar(texto);
+    }
+    if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(texto).then(function () { U.toast(ok); }, viejo);
+    else viejo();
+  }
+  function cajaCopiar(texto) {
+    var d = document.createElement('div'); d.className = 'caja-copiar';
+    d.innerHTML = '<div class="card"><div class="card-body"><b>Copiá el link</b><p class="chico muted">El navegador no dejó copiarlo solo. Está seleccionado: apretá Ctrl+C.</p>' +
+      '<input type="text" readonly value="' + esc(texto) + '" style="width:100%"><div class="fila" style="justify-content:flex-end;margin-top:.6rem"><button class="btn btn-primary btn-sm">Listo</button></div></div></div>';
+    document.body.appendChild(d);
+    var inp = d.querySelector('input'); inp.focus(); inp.select();
+    d.querySelector('button').onclick = function () { d.remove(); };
+    d.onclick = function (e) { if (e.target === d) d.remove(); };
   }
 
   /** Tabla de registros (ficha y vista Registros) */
@@ -450,9 +597,13 @@
     // Proveedores
     var pv = topConOtros(agrupar(rs, function (r) { return r.prov; }), 12);
     G.barrasH($('#gProvs'), pv.map(function (o) {
-      return { lab: esc(o.k) + (o.otros ? ' (' + o.otros + ')' : ''), titulo: o.k, total: o.total, partes: partes(o), sub: med,
-        onClick: o.otros ? null : function () { g.prov = o.k; pintarGeneral(); U.toast('Filtrado: ' + o.k); } };
+      var info = o.otros ? null : IDX.provs.get(o.k);
+      return { lab: esc(o.k) + (o.otros ? ' (' + o.otros + ')' : '') + (info ? '<span class="lab-sub">' + esc(rubrosTexto(info, 2)) + '</span>' : ''), titulo: o.k, total: o.total, partes: partes(o), sub: med,
+        tipHtml: info ? tipProveedor(o.k, info) : null,
+        onClick: o.otros ? null : function () { mostrarProveedor(o.k); } };
     }), { vacio: 'Los registros filtrados no tienen proveedor (las obras y entregas de BASE DE DATOS no lo cargan)' });
+    if (S.provAbierto && !IDX.provs.has(S.provAbierto)) S.provAbierto = null;
+    pintarInfoProveedor();
 
     // Nivel y localidad
     var nv = U.sinAlFinal(agrupar(rs, function (r) { return r.I.nivel || 'Sin dato'; }).sort(function (a, b) { return b.total - a.total; }), function (o) { return o.k; });
@@ -466,6 +617,44 @@
     }));
 
     pintarCalor(rs);
+  }
+
+  // ── Proveedores: qué hace cada uno, deducido de lo que tiene cargado
+  function armarIndices() {
+    IDX.porInst = new Map(); IDX.provs = new Map();
+    Datos.regs.forEach(function (r) {
+      var a = IDX.porInst.get(r.inst); if (!a) IDX.porInst.set(r.inst, a = []); a.push(r);
+      if (!r.prov) return;
+      var p = IDX.provs.get(r.prov);
+      if (!p) IDX.provs.set(r.prov, p = { n: 0, rubros: new Map(), servicios: new Map(), insts: new Set(), anios: new Set(), tipos: {} });
+      p.n++; p.rubros.set(r.cat, (p.rubros.get(r.cat) || 0) + 1); p.insts.add(r.inst); if (r.anio) p.anios.add(r.anio); p.tipos[r.t] = (p.tipos[r.t] || 0) + 1;
+      var sv = String(r.serv || '').replace(/\s*·\s*ítem.*$/, ''); if (sv) p.servicios.set(sv, (p.servicios.get(sv) || 0) + 1);
+    });
+  }
+  function ordenarMapa(m) { return U.sinAlFinal(Array.from(m.entries()).sort(function (a, b) { return b[1] - a[1]; }), function (e) { return e[0]; }); }
+  function rubrosTexto(p, k) { return ordenarMapa(p.rubros).slice(0, k).map(function (e) { return U.icono(e[0]) + ' ' + e[0]; }).join(' · ') + (p.rubros.size > k ? ' · +' + (p.rubros.size - k) : ''); }
+  function aniosTexto(p) { var a = Array.from(p.anios).sort(); return a.length ? (a[0] === a[a.length - 1] ? String(a[0]) : a[0] + '–' + a[a.length - 1]) : 's/f'; }
+  function tipProveedor(nom, p) {
+    return '<div class="t">' + esc(nom) + '</div><div class="chico muted" style="margin-bottom:.3rem">' + n(p.n) + ' registros · ' + n(p.insts.size) + ' instituciones · ' + aniosTexto(p) + '</div>' +
+      ordenarMapa(p.rubros).slice(0, 6).map(function (e) { return '<div class="r"><span>' + U.icono(e[0]) + ' ' + esc(e[0]) + '</span><b>' + n(e[1]) + '</b></div>'; }).join('') +
+      (p.servicios.size ? '<div class="chico muted" style="margin-top:.3rem">Contratos: ' + esc(ordenarMapa(p.servicios).slice(0, 3).map(function (e) { return e[0]; }).join(' · ')) + '</div>' : '') +
+      '<div class="chico muted" style="margin-top:.25rem">Tocá para ver el resumen</div>';
+  }
+  function mostrarProveedor(nom) { S.provAbierto = S.provAbierto === nom ? null : nom; pintarInfoProveedor(); if (S.provAbierto) $('#gProvInfo').scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
+  function pintarInfoProveedor() {
+    var cont = $('#gProvInfo'), nom = S.provAbierto, p = nom && IDX.provs.get(nom);
+    if (!p) { cont.innerHTML = ''; return; }
+    var insts = Array.from(p.insts).map(function (id) { return [id, (IDX.porInst.get(id) || []).filter(function (r) { return r.prov === nom; }).length]; }).sort(function (a, b) { return b[1] - a[1]; });
+    cont.innerHTML = '<div class="info-prov"><div class="fila" style="justify-content:space-between;align-items:flex-start"><div><b>🚚 ' + esc(nom) + '</b>' +
+      '<div class="chico muted">' + n(p.n) + ' registros (' + TIPOS.filter(function (t) { return p.tipos[t]; }).map(function (t) { return T[t].nombre.toLowerCase() + ' ' + n(p.tipos[t]); }).join(', ') + ') · ' +
+      n(p.insts.size) + ' instituciones · ' + aniosTexto(p) + '</div></div><button class="btn btn-secondary btn-sm" id="pCerrar" aria-label="Cerrar">✕</button></div>' +
+      '<div class="etiquetas">' + ordenarMapa(p.rubros).map(function (e) { return '<span class="etiqueta">' + U.icono(e[0]) + ' ' + esc(e[0]) + ': <b>' + n(e[1]) + '</b></span>'; }).join('') + '</div>' +
+      (p.servicios.size ? '<div class="chico" style="margin-top:.5rem"><b>Contratos / órdenes de compra:</b> ' + ordenarMapa(p.servicios).map(function (e) { return esc(e[0]) + ' (' + n(e[1]) + ')'; }).join(' · ') + '</div>' : '') +
+      '<div class="chico" style="margin-top:.4rem"><b>Donde más trabajó:</b> ' + insts.slice(0, 8).map(function (x) { return linkInst(x[0]) + ' (' + x[1] + ')'; }).join(' · ') + (insts.length > 8 ? ' …' : '') + '</div>' +
+      '<div class="fila" style="margin-top:.7rem"><button class="btn btn-primary btn-sm" id="pFiltrar">📊 Filtrar los gráficos</button><button class="btn btn-secondary btn-sm" id="pRegs">📋 Ver sus registros</button></div></div>';
+    $('#pCerrar').onclick = function () { S.provAbierto = null; pintarInfoProveedor(); };
+    $('#pFiltrar').onclick = function () { S.g.prov = nom; pintarGeneral(); U.toast('Filtrado: ' + nom); };
+    $('#pRegs').onclick = function () { S.r = { q: '', tipo: '', anio: '', cat: '', prov: nom, fuente: '', col: 'orden', dir: -1, pag: 0 }; $('#rTexto').value = ''; irA('registros', true); };
   }
 
   function datosCalor(rs) {
@@ -494,7 +683,7 @@
   function filtrarRegistros() {
     var r = S.r, q = U.norm(r.q), partesQ = q ? q.split(' ') : [];
     return Datos.regs.filter(function (x) {
-      return (!r.tipo || x.t === r.tipo) && (!r.anio || String(x.anio) === r.anio) && (!r.cat || x.cat === r.cat) && (!r.fuente || x.fuente === r.fuente) &&
+      return (!r.tipo || x.t === r.tipo) && (!r.anio || String(x.anio) === r.anio) && (!r.cat || x.cat === r.cat) && (!r.prov || x.prov === r.prov) && (!r.fuente || x.fuente === r.fuente) &&
         (!partesQ.length || partesQ.every(function (p) { return x.busca.indexOf(p) >= 0; }));
     });
   }
@@ -505,6 +694,7 @@
     U.opciones($('#rAnio'), valores(Datos.regs, function (x) { return x.anio; }).sort().reverse(), 'Todos', r.anio);
     U.opciones($('#rCat'), valores(base, function (x) { return x.cat; }).sort(U.ordenTexto), 'Todas', r.cat);
     U.opciones($('#rFuente'), valores(Datos.regs, function (x) { return x.fuente; }).sort(), 'Todas', r.fuente);
+    U.opciones($('#rProv'), valores(base, function (x) { return x.prov; }).sort(U.ordenTexto), 'Todos', r.prov);
     var rs = filtrarRegistros();
     var col = r.col, dir = r.dir;
     rs.sort(function (a, b) {
@@ -585,8 +775,10 @@
         '<div class="chico muted" style="margin:0 0 .6rem">' + esc(g.p[3]) + '</div><div class="lista-avisos" style="padding-bottom:.8rem">' +
         g.items.slice(0, 500).map(function (x) {
           var donde = x.ref ? U.nombreHoja(x.ref[0]) + (x.ref[1] ? ' · celda ' + U.celdaTexto(x.ref) : '') : (x.hojaNom ? x.hojaNom + (x.fila ? ' · fila ' + x.fila : '') : '');
-          return '<div class="aviso-fila"><div><div>' + (x.inst ? linkInst(x.inst, x.texto) : esc(x.texto)) + '</div>' + (donde ? '<div class="chico muted">' + esc(donde) + '</div>' : '') + '</div>' +
-            (x.ref ? botonIr(x.ref, 'Ir a la celda') : '') + '</div>';
+          var ir = x.ref && Datos.hojas[x.ref[0]];
+          return '<div class="aviso-fila' + (ir ? ' click' : '') + '"' + (ir ? ' data-ref="' + esc(x.ref.join('|')) + '" role="button" tabindex="0" title="Abrir ' + esc(donde) + '"' : '') + '><div><div>' + esc(x.texto) + '</div>' +
+            '<div class="chico muted">' + esc(donde) + (x.inst ? ' · <a class="ver-ficha" data-inst="' + esc(x.inst) + '">Ver ficha</a>' : '') + '</div></div>' +
+            (ir ? '<span class="btn-ir con-texto" aria-hidden="true">↗ Ir a la celda</span>' : '') + '</div>';
         }).join('') + (g.items.length > 500 ? '<div class="chico muted">Se muestran 500 de ' + n(g.items.length) + '. Bajá el Excel para verlos todos.</div>' : '') + '</div></details>';
     }).join('') : '<div class="vacio"><span class="grande">✅</span>Sin problemas' + (S.calHoja ? ' en esta planilla' : '') + '</div>';
     html += '</div></article>';
@@ -607,9 +799,12 @@
     $$('#nav button').forEach(function (b) { b.onclick = function () { irA(b.dataset.vista, true); }; });
     // links a fichas desde cualquier tabla
     document.addEventListener('click', function (e) {
+      var a = e.target.closest('[data-inst]'); if (a) { e.preventDefault(); abrirFicha(a.dataset.inst); return; }
       var b = e.target.closest('[data-ref]');
-      if (b) { e.preventDefault(); var p = b.dataset.ref.split('|'); U.abrirCelda([p[0], +p[1], +p[2]]); return; }
-      var a = e.target.closest('[data-inst]'); if (a) { e.preventDefault(); abrirFicha(a.dataset.inst); }
+      if (b) { e.preventDefault(); var p = b.dataset.ref.split('|'); U.abrirCelda([p[0], +p[1], +p[2]]); }
+    });
+    document.addEventListener('keydown', function (e) {
+      if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('.aviso-fila[data-ref]')) { e.preventDefault(); e.target.click(); }
     });
 
     var q = $('#q');
@@ -622,7 +817,10 @@
       else if (e.key === 'Enter') { if (sugIdx >= 0 && sugLista[sugIdx]) abrirFicha(sugLista[sugIdx].id); }
       else if (e.key === 'Escape') cerrarSug();
     });
-    ['#bNivel', '#bGestion', '#bLocalidad', '#bSolo'].forEach(function (s) { $(s).addEventListener('change', function () { pintarLista(); }); });
+    CAMPOS_B.forEach(function (k) { $('#' + k).addEventListener('change', function () { delete this.dataset.pendiente; if (k === 'bOrden' && this.value) { var p = this.value.split('|'); S.lista = { col: p[0], dir: +p[1] }; } guardarFiltrosB(); pintarLista(); }); });
+    $('#bLimpiar').onclick = limpiarFiltrosB;
+    restaurarFiltrosB();
+    if ($('#bOrden').value) { var po = $('#bOrden').value.split('|'); S.lista = { col: po[0], dir: +po[1] }; }
     $('#btnExcelInst').onclick = function () {
       var arr = pintarLista.ultima || [];
       exportarExcel('SAE Entregas - instituciones', [{ nombre: 'Instituciones', titulo: 'Instituciones · entregas, obras y arreglos', subtitulo: 'Descargado el ' + hoy(),
@@ -658,7 +856,7 @@
 
     // Registros
     $('#rTexto').addEventListener('input', U.debounce(function () { S.r.q = this.value; S.r.pag = 0; pintarRegistros(); }, 200));
-    [['#rTipo', 'tipo'], ['#rAnio', 'anio'], ['#rCat', 'cat'], ['#rFuente', 'fuente']].forEach(function (p) {
+    [['#rTipo', 'tipo'], ['#rAnio', 'anio'], ['#rCat', 'cat'], ['#rProv', 'prov'], ['#rFuente', 'fuente']].forEach(function (p) {
       $(p[0]).addEventListener('change', function () { S.r[p[1]] = this.value; if (p[1] === 'tipo') S.r.cat = ''; S.r.pag = 0; pintarRegistros(); });
     });
     $('#rExcel').onclick = function () {
@@ -681,9 +879,15 @@
       U.opciones($('#bNivel'), valores(insts, function (i) { return i.nivel; }).sort(U.ordenTexto), 'Todos', $('#bNivel').value);
       U.opciones($('#bGestion'), valores(insts, function (i) { return i.gestion; }).sort(U.ordenTexto), 'Todas', $('#bGestion').value);
       U.opciones($('#bLocalidad'), valores(insts, function (i) { return i.localidad; }).sort(U.ordenTexto), 'Todas', $('#bLocalidad').value);
+      U.opciones($('#bTieneCat'), valores(Datos.regs, function (r) { return r.cat; }).sort(U.ordenTexto).map(function (c) { return [c, U.icono(c) + ' ' + c]; }), 'Cualquiera', $('#bTieneCat').value);
+      U.opciones($('#bProv'), valores(Datos.regs, function (r) { return r.prov; }).sort(U.ordenTexto), 'Todos', $('#bProv').value);
+      ['bNivel', 'bGestion', 'bLocalidad', 'bTieneCat', 'bProv'].forEach(function (k) { var el = $('#' + k); if (el.dataset.pendiente) { el.value = el.dataset.pendiente; if (el.value === el.dataset.pendiente) delete el.dataset.pendiente; } });
+      if (['bInactiva', 'bDesde', 'bHasta', 'bTieneCat', 'bProv'].some(function (k) { return $('#' + k).value; })) $('#bMas').open = true;
+      armarIndices();
       pintar();
     });
     U.opciones($('#bNivel'), [], 'Todos'); U.opciones($('#bGestion'), [], 'Todas'); U.opciones($('#bLocalidad'), [], 'Todas');
+    U.opciones($('#bTieneCat'), [], 'Cualquiera'); U.opciones($('#bProv'), [], 'Todos');
     irA(S.vista, false);
     Datos.cargar(false);
   }
