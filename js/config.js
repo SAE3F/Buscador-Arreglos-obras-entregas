@@ -4,7 +4,7 @@
 window.CONFIG = {
   VERSION_PAGINA: '0.1.0',
   SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbzizx7KZItmqAt8g1r7kx3rkbEw9nMNOuUAjalGAE0WpfzNEwvxk_hRtylfQq8CY2GZzw/exec',                 // ← pegar acá la URL del script
-  VERSION_SCRIPT_ESPERADA: '1.0.0',
+  VERSION_SCRIPT_ESPERADA: '1.1.0',
   TIEMPO_ESPERA_MS: 60000,        // Google puede tardar en armar todo la primera vez
   CLAVE_COPIA: 'sae-entregas-datos-v1'
 };
