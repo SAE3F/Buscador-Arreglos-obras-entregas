@@ -23,8 +23,8 @@
 - Todo lo que diga **"Sin tipo" / "Sin categoría" / "Sin rubro" / "Sin dato"** va **siempre al final** (filtros, gráficos, tablas, Excel). Si hay "Otras", va anteúltimo.
 - **Este archivo es el hilo del trabajo:** cada vez que haya algo que otro Claude necesite saber (una actualización entregada,
   un pendiente anotado o resuelto, una decisión, una regla nueva, un cambio en planillas o en el script), **se actualiza este
-  archivo**, con la fecha en la sección 8 (Registro). **Se entrega una sola vez, junto con el zip de cada actualización**
-  (no en cada mensaje).
+  archivo**, con la fecha en la sección 8 (Registro). **Va DENTRO del zip de cada actualización** (en la raíz, `CONTEXTO_SAE_ENTREGAS.md`),
+  no como archivo suelto ni en cada mensaje.
 
 ## 2. Qué es la página
 
@@ -72,6 +72,7 @@ css/tokens-3f.css     del kit, sin cambios
 css/app.css           estilos propios (al final hay bloques "v0.2.0" y "v0.3.0")
 js/escuelas-extra.js  (equipo) dirección, directora, cargo, localidad, CUE por escuela → window.ESCUELAS_EXTRA
 js/coordenadas.js     lat/lng por escuela (de mapa/data_escuelas.js de SAE Gestión; solo nombre y coordenadas) → window.ESCUELAS_COORDS
+js/pdf.js             PDF sin librerías (Helvetica, A4, "Hoja X de Y"): window.PDFsimple
 js/config.js          SOLO CONFIG.SCRIPT_URL (de la persona usuaria; no viene en actualizaciones)
 js/version.js         VERSION_PAGINA y VERSION_SCRIPT_ESPERADA (viene en cada actualización)
 js/util.js            utilidades: esc, n (es-AR), norm, íconos por categoría, esSin/ordenTexto/sinAlFinal, urlCelda/abrirCelda
@@ -99,10 +100,10 @@ vercel.json, AGENTS.md, assets/ (del kit), README.md
 ## 5. Estado actual (24/11/2026)
 
 - **Propósito:** buscador resumido de todo lo hecho en cada escuela, para ver, imprimir o descargar antes o durante una visita.
-- **Página:** versión **0.5.1** entregada el 25/11/2026 como **repo completo** (0.5.0 + agrupar solo FACTURACION ITEMS), sobre la 0.4.0 del equipo. Título: **Ficha Escuelas**.
+- **Página:** versión **0.5.2** entregada el 25/11/2026 (zip con archivos cambiados sobre la 0.5.1 completa). Título: **Ficha Escuelas**.
   Falta confirmar que se subió y que se publicó el Apps Script 1.2.0.
 - **Apps Script:** versión **1.2.0** entregada (agrega reclamos). Hay que publicarla como Nueva versión. Antes estaba la 1.1.0 publicada como aplicación web ("Ejecutar como: Yo", "Cualquier persona"). La URL está en el `js/config.js` de la persona usuaria.
-- Historial: 0.1.0 (primera versión) → 0.1.1 (tablas de ancho fijo, una línea) → 0.2.0 (script 1.1.0: ir a la celda, calidad por problema, ranking Menos/Sin registros, "Sin tipo" al final, encabezados verticales) → 0.3.0 (copiar link con respaldo, aviso clicable, version.js, 12 filtros nuevos, tabla institución × categoría con columnas fijas, info de proveedores) → 0.4.0 (equipo: "Ficha Escuelas", escuelas-extra.js) → 0.5.0 (script 1.2.0: reclamos en la ficha, cómo llegar y ver en el mapa, ficha para visita con opciones e impresión numerada, arreglos agrupados desplegables, filtros nuevos en Vista general / Registros / Calidad con etiquetas ✕ y link con filtros, localidades en mayúsculas, CUE sin ".0") → 0.5.1 (arreglos agrupados solo de FACTURACION ITEMS).
+- Historial: 0.1.0 (primera versión) → 0.1.1 (tablas de ancho fijo, una línea) → 0.2.0 (script 1.1.0: ir a la celda, calidad por problema, ranking Menos/Sin registros, "Sin tipo" al final, encabezados verticales) → 0.3.0 (copiar link con respaldo, aviso clicable, version.js, 12 filtros nuevos, tabla institución × categoría con columnas fijas, info de proveedores) → 0.4.0 (equipo: "Ficha Escuelas", escuelas-extra.js) → 0.5.0 (script 1.2.0: reclamos en la ficha, cómo llegar y ver en el mapa, ficha para visita con opciones e impresión numerada, arreglos agrupados desplegables, filtros nuevos en Vista general / Registros / Calidad con etiquetas ✕ y link con filtros, localidades en mayúsculas, CUE sin ".0") → 0.5.1 (arreglos agrupados solo de FACTURACION ITEMS) → 0.5.2 (grupos en verde; Ficha para visita: botón **PDF a color** que descarga directo (js/pdf.js, sin librerías) y botón **Imprimir en blanco y negro**; sin "Cómo llegar" en impresión/PDF; reclamos pedidos de antemano para que sea rápido).
 
 ## 6. Pendientes y temas abiertos
 
@@ -123,7 +124,9 @@ vercel.json, AGENTS.md, assets/ (del kit), README.md
 - Cómo llegar: **desde la Municipalidad de Tres de Febrero (Alberdi 4840, Caseros)**, con coordenadas (respaldo: dirección).
 - Arreglos agrupados: **solo FACTURACION ITEMS**; misma escuela + rubro + proveedor, fechas del mismo día o seguidas (±1 día encadenado).
 - Ficha para visita: se elige apartados, columnas, período (todo / 12 meses / lo filtrado) y formato (resumida = últimos 10 / completa);
-  hojas numeradas abajo a la izquierda ("Hoja X de Y").
+  hojas numeradas abajo a la izquierda ("Hoja X de Y"). **PDF siempre a color** (descarga directa) e **Imprimir siempre en blanco y negro**.
+  **Sin "Cómo llegar"** en impresión/PDF (el botón en pantalla y el Excel lo mantienen).
+- Un arreglo de una sola tarea en una escuela ese día queda como fila suelta (no hay nada que agrupar).
 
 ## 7. Cosas a tener en cuenta
 
@@ -151,3 +154,7 @@ vercel.json, AGENTS.md, assets/ (del kit), README.md
 - **25/11/2026:** se entrega la **0.5.0** (página) y el **Apps Script 1.2.0**. Todos los pendientes de esa fecha quedan hechos. Próximo: optimización para celulares.
 - **25/11/2026:** pendiente: agrupar solo los arreglos de FACTURACION ITEMS (hoy también agrupa Atmosférico y Canaletas).
 - **25/11/2026:** **0.5.1**: se agrupan solo los arreglos de FACTURACION ITEMS. Se entrega el repo completo.
+- **25/11/2026:** el contexto va siempre dentro del zip de cada actualización (no suelto).
+- **25/11/2026:** pendiente: color propio para los arreglos agrupados.
+- **25/11/2026:** pendiente: sacar "Cómo llegar" de la ficha para visita (queda solo la dirección en Datos).
+- **25/11/2026:** **0.5.2**: grupos en verde, PDF a color directo, Imprimir en B/N, sin "Cómo llegar" en lo impreso, reclamos precargados.

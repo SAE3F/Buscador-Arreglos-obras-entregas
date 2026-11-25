@@ -173,7 +173,15 @@
       return guardar(j.reclamos);
     });
   };
-  Datos.alCambiar = function (f) { Datos.oyentes.push(f); };
+  /** Pide los reclamos una vez apenas carga la página: el script arma su copia y después cada ficha abre al instante */
+  var precalentado = false;
+  Datos.precalentarReclamos = function () {
+    if (precalentado || Datos.recPrueba || !C.SCRIPT_URL) return; precalentado = true;
+    setTimeout(function () {
+      fetch(C.SCRIPT_URL + (C.SCRIPT_URL.indexOf('?') < 0 ? '?' : '&') + 'accion=reclamos&inst=_&t=' + Date.now(), { cache: 'no-store' }).catch(function () {});
+    }, 1500);
+  };
+    Datos.alCambiar = function (f) { Datos.oyentes.push(f); };
   setInterval(mostrarEstado, 60000);
   window.Datos = Datos;
 })();

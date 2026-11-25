@@ -404,7 +404,7 @@
 
   // ───────────────────────── Ficha para visita (imprimir / PDF / Excel)
   var CLAVE_VISITA = 'sae-ficha-visita';
-  var SECCIONES = [['datos', '🏫 Datos de la escuela'], ['llegar', '🧭 Cómo llegar'], ['resumen', '📊 Resumen'], ['reclamos', '📣 Últimos reclamos'],
+  var SECCIONES = [['datos', '🏫 Datos de la escuela'], ['resumen', '📊 Resumen'], ['reclamos', '📣 Últimos reclamos'],
     ['E', '📦 Entregas'], ['O', '🏗️ Obras'], ['A', '🛠️ Arreglos']];
   var COLS_V = [['fecha', 'Fecha'], ['cat', 'Categoría / rubro'], ['det', 'Detalle'], ['cant', 'Cantidad'], ['prov', 'Proveedor'], ['fuente', 'Planilla']];
   var COLS_R = [['estado', 'Estado'], ['fecha', 'Fecha'], ['tema', 'Tipo y categoría'], ['det', 'Detalle'], ['res', 'Resolución'], ['resp', 'Responsable'], ['acc', 'Acciones']];
@@ -447,8 +447,9 @@
       '<fieldset><legend>Columnas de entregas, obras y arreglos</legend><div class="opciones">' + caja('cols', COLS_V, o.cols) +
       '<label class="check"><input type="checkbox" data-g="x" data-k="agrupar"' + (o.agrupar ? ' checked' : '') + '> Agrupar los trabajos de un mismo arreglo</label></div></fieldset>' +
       '<fieldset><legend>Reclamos</legend><div class="opciones">' + radio('recN', [[5, 'Últimos 5'], [10, 'Últimos 10'], [20, 'Últimos 20']], o.recN) + '</div><div class="opciones">' + caja('recCols', COLS_R, o.recCols) + '</div></fieldset>' +
-      '</div><div class="modal-pie"><span class="chico muted">Para PDF: en la ventana de impresión elegí “Guardar como PDF”.</span><span class="espacio"></span>' +
-      '<button class="btn btn-secondary btn-sm" data-cerrar>Cancelar</button><button class="btn btn-secondary btn-sm" id="vExcel">⬇️ Excel</button><button class="btn btn-primary btn-sm" id="vImprimir">🖨️ Imprimir / PDF</button></div></div>';
+      '</div><div class="modal-pie"><span class="chico muted" id="vEstado">El PDF se descarga a color. Imprimir abre la impresora en blanco y negro.</span>' +
+      '<button class="btn btn-secondary btn-sm" data-cerrar>Cancelar</button><button class="btn btn-secondary btn-sm" id="vExcel">⬇️ Excel</button>' +
+      '<button class="btn btn-secondary btn-sm" id="vImprimir">🖨️ Imprimir (blanco y negro)</button><button class="btn btn-primary btn-sm" id="vPdf">⬇️ PDF a color</button></div></div>';
     m.classList.remove('oculto'); document.body.classList.add('con-modal');
     function leer() {
       var r = { sec: {}, cols: {}, recCols: {} };
@@ -460,77 +461,169 @@
     function cerrar() { m.classList.add('oculto'); m.innerHTML = ''; document.body.classList.remove('con-modal'); }
     m.onclick = function (e) { if (e.target === m || e.target.closest('[data-cerrar]')) cerrar(); };
     m.onkeydown = function (e) { if (e.key === 'Escape') cerrar(); };
-    $('#vImprimir').onclick = function () { var r = leer(); cerrar(); imprimirVisita(i, regs, r); };
-    $('#vExcel').onclick = function () { var r = leer(); cerrar(); excelEscuela(i, regs, r, true); };
-    setTimeout(function () { var b = $('#vImprimir'); if (b) b.focus(); }, 30);
+    // Los reclamos se piden apenas se abre la ventana (si no estaban ya), así imprimir es inmediato
+    var listo = conReclamos(i, { sec: { reclamos: true } });
+    function accion(fn) {
+      return function () {
+        var r = leer(), est = $('#vEstado');
+        $$('.modal-pie button', m).forEach(function (b) { b.disabled = true; });
+        if (est) est.textContent = '⏳ Preparando…';
+        listo.then(function () { cerrar(); fn(r); });
+      };
+    }
+    $('#vPdf').onclick = accion(function (r) { pdfVisita(i, regs, r); });
+    $('#vImprimir').onclick = accion(function (r) { imprimirVisita(i, regs, r); });
+    $('#vExcel').onclick = accion(function (r) { excelEscuela(i, regs, r, true); });
+    setTimeout(function () { var b = $('#vPdf'); if (b) b.focus(); }, 30);
   }
   function conReclamos(i, o) {
     if (!o.sec.reclamos) return Promise.resolve(null);
     return Datos.reclamos(i.id).catch(function () { return { error: true, total: 0, abiertos: 0, items: [] }; });
   }
+  /** Modelo de la ficha para visita (lo usan la impresión y el PDF) */
+  function armarVisita(i, regs, o, R) {
+    var sel = regsVisita(regs, o), LIM = o.formato === 'resumida' ? 10 : Infinity, cols = COLS_V.filter(function (c) { return o.cols[c[0]]; });
+    var M = {
+      titulo: i.id, sub: i.completo || '',
+      fecha: new Date().toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ' ' + new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }),
+      periodo: { todo: 'Todo el historial', '12m': 'Últimos 12 meses', ficha: 'Filtrado en la ficha' }[o.periodo] + (o.formato === 'resumida' ? ' · resumida' : ' · completa'),
+      secciones: []
+    };
+    if (o.sec.datos) M.secciones.push({ tipo: 'datos', titulo: 'Datos de la escuela', icono: '🏫', items: [['Dirección', i.direccion], ['Localidad', i.localidad],
+      ['Directora / director', i.directora ? i.directora + (i.cargo ? ' (' + i.cargo.toLowerCase() + ')' : '') : ''], ['Nivel', i.nivel], ['Gestión', i.gestion], ['CUE', i.cue],
+      ['Matrícula / cupo SAE', i.matricula ? n(i.matricula) : ''], ['Servicio SAE', i.servicio]].filter(function (x) { return x[1]; }) });
+    if (o.sec.resumen) {
+      var por = { E: [], O: [], A: [] }; sel.forEach(function (r) { por[r.t].push(r); });
+      var ult = sel.slice().sort(function (a, b) { return a.orden < b.orden ? 1 : -1; })[0];
+      var k = TIPOS.map(function (t) { return [n(por[t].length), T[t].nombre + (t === 'E' ? ' · ' + n(por.E.reduce(function (s, r) { return s + r.cant; }, 0)) + ' u.' : ''), t]; });
+      k.push([ult ? String(fechaReg(ult)) : '—', 'Último movimiento' + (ult ? ' · ' + T[ult.t].uno + ' · ' + ult.cat : '')]);
+      if (R && !R.error) k.push([n(R.abiertos), 'Reclamos sin resolver']);
+      M.secciones.push({ tipo: 'resumen', titulo: 'Resumen', icono: '📊', items: k });
+    }
+    if (o.sec.reclamos) {
+      var rc = COLS_R.filter(function (c) { return o.recCols[c[0]]; }), S1 = { tipo: 'tabla', titulo: 'Últimos reclamos', icono: '📣', cols: rc.map(function (c) { return { k: c[0], t: c[1] }; }), filas: [] };
+      if (!R || R.error) S1.nota = 'No se pudieron leer los reclamos.';
+      else if (!R.items.length) S1.nota = 'Sin reclamos cargados.';
+      else {
+        S1.nota = resumenReclamos(R);
+        S1.filas = R.items.slice(0, o.recN).map(function (r) {
+          var v = { estado: r.estado, fecha: r.fecha ? U.fecha(r.fecha) : 's/f', tema: [r.tipo, r.cat, r.sub].filter(Boolean).join(' › '), det: r.det + (r.prod ? ' (' + r.prod + ')' : ''),
+            res: r.fres ? U.fecha(r.fres) + (r.fecha && diasEntre(r.fecha, r.fres) >= 0 ? ' · ' + diasEntre(r.fecha, r.fres) + ' días' : '') : '', resp: r.resp, acc: r.acc };
+          var f = rc.map(function (c) { return v[c[0]] || ''; }); f.estado = claseEstado(r.estado); return f;
+        });
+      }
+      M.secciones.push(S1);
+    }
+    TIPOS.forEach(function (t) {
+      if (!o.sec[t]) return;
+      var l = listaTipo(sel, t, o), vis = l.slice(0, LIM);
+      M.secciones.push({ tipo: 'tabla', t: t, titulo: T[t].nombre, icono: T[t].icono, total: l.length, cols: cols.map(function (c) { return { k: c[0], t: c[1], der: c[0] === 'cant' }; }),
+        nota: l.length ? '' : 'Sin registros en este período.',
+        filas: vis.map(function (r) {
+          var v = { fecha: r.grupo ? fechaGrupo(r) : String(fechaReg(r)), cat: r.cat,
+            det: r.grupo ? r.det + ': ' + r.items.map(function (x) { return x.det.replace(/:\s*$/, '') + (x.cant > 1 ? ' (' + x.cant + ')' : ''); }).join(' · ') : r.det,
+            cant: n(r.cant), prov: r.prov, fuente: r.fuente };
+          var f = cols.map(function (c) { return v[c[0]] || ''; }); f.grupo = !!r.grupo; return f;
+        }),
+        mas: l.length > vis.length ? '… y ' + n(l.length - vis.length) + ' más (elegí “Completa” para verlos todos).' : '' });
+    });
+    return M;
+  }
+  /** Imprimir: hoja en blanco y negro con el diálogo de la impresora */
   function imprimirVisita(i, regs, o) {
-    U.toast('Preparando la ficha…');
     conReclamos(i, o).then(function (R) {
-      var sel = regsVisita(regs, o), LIM = o.formato === 'resumida' ? 10 : Infinity, cols = COLS_V.filter(function (c) { return o.cols[c[0]]; });
-      var hoyTxt = new Date().toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ' ' + new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
-      var nomPeriodo = { todo: 'Todo el historial', '12m': 'Últimos 12 meses', ficha: 'Filtrado en la ficha' }[o.periodo];
+      var M = armarVisita(i, regs, o, R);
       var h = '<header class="impr-cab"><img src="assets/logo_3f_96.png" alt=""><div><div class="impr-org">Municipalidad de Tres de Febrero · Ficha Escuelas</div>' +
-        '<h1>' + esc(i.id) + '</h1><div class="impr-sub">' + esc(i.completo || '') + '</div></div><div class="impr-fecha">Impreso el ' + esc(hoyTxt) + '<br>' + esc(nomPeriodo) +
-        (o.formato === 'resumida' ? ' · resumida' : ' · completa') + '</div></header>';
-      if (o.sec.datos) {
-        var d = [['Dirección', i.direccion], ['Localidad', i.localidad], ['Directora / director', i.directora ? i.directora + (i.cargo ? ' (' + i.cargo.toLowerCase() + ')' : '') : ''],
-          ['Nivel', i.nivel], ['Gestión', i.gestion], ['CUE', i.cue], ['Matrícula / cupo SAE', i.matricula ? n(i.matricula) : ''], ['Servicio SAE', i.servicio]].filter(function (x) { return x[1]; });
-        h += '<section><h2>🏫 Datos de la escuela</h2><dl class="impr-datos">' + d.map(function (x) { return '<dt>' + x[0] + '</dt><dd>' + esc(x[1]) + '</dd>'; }).join('') + '</dl></section>';
-      }
-      if (o.sec.llegar) {
-        h += '<section><h2>🧭 Cómo llegar</h2><p>' + esc([i.direccion, i.localidad].filter(Boolean).join(', ') || 'Sin dirección cargada') + '</p>' +
-          '<p class="chico">Ruta desde la Municipalidad (Alberdi 4840, Caseros): <a href="' + esc(urlComoLlegar(i)) + '">abrir en Google Maps</a>' +
-          (i.lat ? ' · coordenadas ' + i.lat + ', ' + i.lng : '') + '</p></section>';
-      }
-      if (o.sec.resumen) {
-        var por = { E: [], O: [], A: [] }; sel.forEach(function (r) { por[r.t].push(r); });
-        var ult = sel.slice().sort(function (a, b) { return a.orden < b.orden ? 1 : -1; })[0];
-        h += '<section><h2>📊 Resumen</h2><div class="impr-kpis">' + TIPOS.map(function (t) {
-          return '<div><b>' + n(por[t].length) + '</b><span>' + T[t].nombre + (t === 'E' ? ' · ' + n(por.E.reduce(function (s, r) { return s + r.cant; }, 0)) + ' u.' : '') + '</span></div>';
-        }).join('') + '<div><b>' + (ult ? fechaReg(ult) : '—') + '</b><span>Último movimiento' + (ult ? ' · ' + esc(T[ult.t].uno + ' · ' + ult.cat) : '') + '</span></div>' +
-          (R && !R.error ? '<div><b>' + n(R.abiertos) + '</b><span>Reclamos sin resolver</span></div>' : '') + '</div></section>';
-      }
-      if (o.sec.reclamos) {
-        var rc = COLS_R.filter(function (c) { return o.recCols[c[0]]; });
-        h += '<section><h2>📣 Últimos reclamos</h2>';
-        if (!R || R.error) h += '<p class="chico">No se pudieron leer los reclamos.</p>';
-        else if (!R.items.length) h += '<p class="chico">Sin reclamos cargados.</p>';
+        '<h1>' + esc(M.titulo) + '</h1><div class="impr-sub">' + esc(M.sub) + '</div></div><div class="impr-fecha">Impreso el ' + esc(M.fecha) + '<br>' + esc(M.periodo) + '</div></header>';
+      M.secciones.forEach(function (S2) {
+        h += '<section><h2>' + S2.icono + ' ' + esc(S2.titulo) + (S2.total != null ? ' <small>(' + n(S2.total) + ')</small>' : '') + '</h2>';
+        if (S2.tipo === 'datos') h += '<dl class="impr-datos">' + S2.items.map(function (x) { return '<dt>' + esc(x[0]) + '</dt><dd>' + esc(x[1]) + '</dd>'; }).join('') + '</dl>';
+        else if (S2.tipo === 'resumen') h += '<div class="impr-kpis">' + S2.items.map(function (x) { return '<div><b>' + esc(x[0]) + '</b><span>' + esc(x[1]) + '</span></div>'; }).join('') + '</div>';
         else {
-          var its = R.items.slice(0, o.recN);
-          h += '<p class="chico">' + esc(resumenReclamos(R)) + '</p><table><thead><tr>' + rc.map(function (c) { return '<th>' + c[1] + '</th>'; }).join('') + '</tr></thead><tbody>' +
-            its.map(function (r) {
-              var v = { estado: r.estado, fecha: r.fecha ? U.fecha(r.fecha) : 's/f', tema: [r.tipo, r.cat, r.sub].filter(Boolean).join(' › '), det: r.det + (r.prod ? ' (' + r.prod + ')' : ''),
-                res: r.fres ? U.fecha(r.fres) + (r.fecha && diasEntre(r.fecha, r.fres) >= 0 ? ' · ' + diasEntre(r.fecha, r.fres) + ' días' : '') : '', resp: r.resp, acc: r.acc };
-              return '<tr>' + rc.map(function (c) { return '<td' + (c[0] === 'fecha' || c[0] === 'res' ? ' class="nw"' : '') + '>' + esc(v[c[0]]) + '</td>'; }).join('') + '</tr>';
-            }).join('') + '</tbody></table>';
+          if (S2.nota) h += '<p class="chico">' + esc(S2.nota) + '</p>';
+          if (S2.filas.length) h += '<table><thead><tr>' + S2.cols.map(function (c) { return '<th' + (c.der ? ' class="num"' : '') + '>' + esc(c.t) + '</th>'; }).join('') + '</tr></thead><tbody>' +
+            S2.filas.map(function (f) { return '<tr' + (f.grupo ? ' class="grupo"' : '') + '>' + f.map(function (v, k) { var c = S2.cols[k];
+              return '<td' + (c.der ? ' class="num"' : c.k === 'fecha' || c.k === 'res' ? ' class="nw"' : '') + '>' + esc(v) + '</td>'; }).join('') + '</tr>'; }).join('') + '</tbody></table>';
+          if (S2.mas) h += '<p class="chico">' + esc(S2.mas) + '</p>';
         }
         h += '</section>';
-      }
-      TIPOS.forEach(function (t) {
-        if (!o.sec[t]) return;
-        var l = listaTipo(sel, t, o), vis = l.slice(0, LIM);
-        h += '<section><h2>' + T[t].icono + ' ' + T[t].nombre + ' <small>(' + n(l.length) + ')</small></h2>';
-        if (!l.length) { h += '<p class="chico">Sin registros en este período.</p></section>'; return; }
-        h += '<table><thead><tr>' + cols.map(function (c) { return '<th' + (c[0] === 'cant' ? ' class="num"' : '') + '>' + c[1] + '</th>'; }).join('') + '</tr></thead><tbody>' +
-          vis.map(function (r) {
-            var v = { fecha: r.grupo ? fechaGrupo(r) : fechaReg(r), cat: r.cat, det: r.grupo ? r.det + ': ' + r.items.map(function (x) { return x.det.replace(/:\s*$/, '') + (x.cant > 1 ? ' (' + x.cant + ')' : ''); }).join(' · ') : r.det,
-              cant: n(r.cant), prov: r.prov, fuente: r.fuente };
-            return '<tr>' + cols.map(function (c) { return '<td' + (c[0] === 'cant' ? ' class="num"' : c[0] === 'fecha' ? ' class="nw"' : '') + '>' + esc(v[c[0]]) + '</td>'; }).join('') + '</tr>';
-          }).join('') + '</tbody></table>' + (l.length > vis.length ? '<p class="chico">… y ' + n(l.length - vis.length) + ' más (elegí “Completa” para verlos todos).</p>' : '') + '</section>';
       });
       var cont = $('#impresion');
-      cont.innerHTML = '<style>@page { size: A4; margin: 14mm 12mm 16mm; @bottom-left { content: "Hoja " counter(page) " de " counter(pages); font: 9pt Inter, Arial, sans-serif; color: #555; } ' +
-        '@bottom-right { content: "Ficha Escuelas · ' + String(i.id).replace(/["\\]/g, '') + '"; font: 9pt Inter, Arial, sans-serif; color: #555; } }</style><div class="impr">' + h + '</div>';
-      document.body.classList.add('imprimiendo');
-      var fin = function () { document.body.classList.remove('imprimiendo'); window.removeEventListener('afterprint', fin); };
+      cont.innerHTML = '<style>@page { size: A4; margin: 14mm 12mm 16mm; @bottom-left { content: "Hoja " counter(page) " de " counter(pages); font: 9pt Inter, Arial, sans-serif; color: #444; } ' +
+        '@bottom-right { content: "Ficha Escuelas · ' + String(i.id).replace(/["\\]/g, '') + '"; font: 9pt Inter, Arial, sans-serif; color: #444; } }</style><div class="impr">' + h + '</div>';
+      document.body.classList.add('imprimiendo', 'bn');
+      var fin = function () { document.body.classList.remove('imprimiendo', 'bn'); window.removeEventListener('afterprint', fin); };
       window.addEventListener('afterprint', fin);
-      setTimeout(function () { window.print(); setTimeout(fin, 1500); }, 120);
+      requestAnimationFrame(function () { window.print(); setTimeout(fin, 1500); });
     });
+  }
+  /** PDF a color, generado en el navegador y descargado directo (sin pasar por la impresora) */
+  function pdfVisita(i, regs, o) {
+    U.toast('⏳ Armando el PDF…');
+    Promise.all([conReclamos(i, o), PDFsimple.logoJPEG('assets/logo_3f_96.png')]).then(function (x) {
+      var M = armarVisita(i, regs, o, x[0]), logo = x[1];
+      var AZUL = '#163c68', NAR = '#f69321', GRIS = '#555555', COLT = { E: '#2a78d6', O: '#eb6834', A: '#1baf7a' };
+      var COLEST = { ok: '#e7f6ee', pend: '#fff1e2', gestion: '#e6effb', otro: '#f1f3f6' };
+      var d = PDFsimple.nuevo({ pie: 'Ficha Escuelas · ' + M.titulo });
+      if (logo) d.imagenJPEG(logo.bytes, logo.w, logo.h);
+      // Encabezado
+      d.dibujarImagen(d.M.izq, d.y, 38, 38);
+      d.txt('MUNICIPALIDAD DE TRES DE FEBRERO · FICHA ESCUELAS', d.M.izq + 48, d.y + 9, 7.5, true, NAR);
+      d.txt(M.titulo, d.M.izq + 48, d.y + 27, 18, true, AZUL);
+      d.txt(M.sub, d.M.izq + 48, d.y + 39, 9, true, '#333333');
+      d.txt('Impreso el ' + M.fecha, d.W - d.M.der, d.y + 12, 8, false, GRIS, 'der');
+      d.txt(M.periodo, d.W - d.M.der, d.y + 23, 8, false, GRIS, 'der');
+      d.y += 46; d.rect(d.M.izq, d.y, d.ancho, 2.2, AZUL); d.y += 10;
+      function titulo(S2) {
+        d.lugar(40); d.y += 4;
+        var col = S2.t ? COLT[S2.t] : AZUL;
+        d.rect(d.M.izq, d.y, 3.5, 13, col);
+        d.txt(S2.titulo + (S2.total != null ? '  (' + n(S2.total) + ')' : ''), d.M.izq + 9, d.y + 10.5, 11.5, true, AZUL);
+        d.y += 17; d.linea(d.M.izq, d.y, d.M.izq + d.ancho, d.y, '#d5dde8', 0.6); d.y += 5;
+      }
+      M.secciones.forEach(function (S2) {
+        titulo(S2);
+        if (S2.tipo === 'datos') {
+          var colW = d.ancho / 2, lh = 13;
+          for (var k = 0; k < S2.items.length; k += 2) {
+            var pares = S2.items.slice(k, k + 2), alto = Math.max.apply(null, pares.map(function (p) { return PDFsimple.partir(p[1], colW - 112, 9, true).length; })) * lh;
+            d.lugar(alto);
+            pares.forEach(function (p, j) {
+              var x0 = d.M.izq + j * colW; d.txt(p[0], x0, d.y + 9, 8.5, false, GRIS);
+              PDFsimple.partir(p[1], colW - 112, 9, true).forEach(function (l, m) { d.txt(l, x0 + 104, d.y + 9 + m * lh, 9, true, '#1f2937'); });
+            });
+            d.y += alto;
+          }
+          d.y += 4;
+        } else if (S2.tipo === 'resumen') {
+          var nI = S2.items.length, g = 6, bw = (d.ancho - g * (nI - 1)) / nI, bh = 40;
+          d.lugar(bh);
+          S2.items.forEach(function (it, k) {
+            var x0 = d.M.izq + k * (bw + g);
+            d.rect(x0, d.y, bw, bh, '#f7f9fc', '#d5dde8');
+            if (it[2]) d.rect(x0, d.y, bw, 3, COLT[it[2]]);
+            d.txt(it[0], x0 + 7, d.y + 19, 13, true, AZUL);
+            PDFsimple.partir(it[1], bw - 12, 7, false).slice(0, 2).forEach(function (l, m) { d.txt(l, x0 + 7, d.y + 29 + m * 8, 7, false, '#444444'); });
+          });
+          d.y += bh + 6;
+        } else {
+          if (S2.nota) d.parrafo(S2.nota, { tam: 8.5, color: '#444444' });
+          if (S2.filas.length) {
+            d.y += 2;
+            var anchos = { fecha: 1.1, cat: 1.5, det: 4.2, cant: 0.75, prov: 1.7, fuente: 1.6, estado: 1, tema: 2.2, res: 1.3, resp: 1.1, acc: 2.2 };
+            var filas = S2.filas.map(function (f) { var c = f.slice(); if (f.grupo) { c.fondo = '#eaf7f1'; c.negrita = true; } if (f.estado) c.fondo = COLEST[f.estado]; return c; });
+            d.tabla(S2.cols.map(function (c) { return { t: c.t, w: anchos[c.k] || 1.2, der: c.der }; }), filas, { tam: 7.8 });
+          }
+          if (S2.mas) d.parrafo(S2.mas, { tam: 8, color: '#555555' });
+          d.y += 6;
+        }
+      });
+      var url = URL.createObjectURL(d.blob()), a = document.createElement('a');
+      a.href = url; a.download = 'Ficha Escuelas - ' + i.id.replace(/[\\\/:*?"<>|]/g, '-') + '.pdf';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+      U.toast('📥 PDF descargado');
+    }).catch(function (e) { console.error(e); U.toast('⚠️ No se pudo armar el PDF: ' + e.message); });
   }
   function excelEscuela(i, regs, o, desdeVisita) {
     conReclamos(i, o).then(function (R) {
@@ -688,7 +781,13 @@
         items: x.items.slice().sort(function (a, b) { return a.fecha < b.fecha ? 1 : -1; }), ref: p.ref, monto: null, fact: '' };
     });
   }
-  function fechaGrupo(g) { return g.desde === g.fecha ? U.fecha(g.fecha) : U.fecha(g.desde) + '–' + U.fecha(g.fecha).slice(0, 5); }
+  function fechaGrupo(g) {            // 05–06/10/25 · 30/09–01/10/25 · 31/12/25–01/01/26
+    if (g.desde === g.fecha) return U.fecha(g.fecha);
+    var a = U.fecha(g.desde), b = U.fecha(g.fecha);
+    if (a.slice(3) === b.slice(3)) return a.slice(0, 2) + '–' + b;
+    if (a.slice(6) === b.slice(6)) return a.slice(0, 5) + '–' + b;
+    return a + '–' + b;
+  }
 
   /** Tabla de registros (ficha y vista Registros). Acepta registros sueltos y grupos de arreglos. */
   function tablaRegs(rs, conInst, orden) {
@@ -1327,6 +1426,7 @@
       ['bNivel', 'bGestion', 'bLocalidad', 'bTieneCat', 'bProv'].forEach(function (k) { var el = $('#' + k); if (el.dataset.pendiente) { el.value = el.dataset.pendiente; if (el.value === el.dataset.pendiente) delete el.dataset.pendiente; } });
       if (['bInactiva', 'bDesde', 'bHasta', 'bTieneCat', 'bProv'].some(function (k) { return $('#' + k).value; })) $('#bMas').open = true;
       armarIndices();
+      Datos.precalentarReclamos();
       $('#dlInst').innerHTML = insts.filter(function (i) { return i.E + i.O + i.A || i.enBase; }).sort(function (a, b) { return ordenEs(a.id, b.id); })
         .map(function (i) { return '<option value="' + esc(i.id) + '">' + esc(i.completo || '') + '</option>'; }).join('');
       pintar();

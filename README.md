@@ -27,7 +27,7 @@ cuando se abre una ficha. No se mandan patologías, cupos ni horarios.
 
 ## Archivos
 - `index.html` · la página. `css/` estilos (`tokens-3f.css` es el del kit, sin cambios). `js/` lógica:
-  `config.js` (solo la URL del script: se completa una vez y no viene en las actualizaciones), `version.js` (versiones: viene en cada actualización), `escuelas-extra.js` (dirección y directora, del equipo), `coordenadas.js` (lat/lng de cada escuela, del mapa de SAE Gestión: solo nombre y coordenadas), `datos.js` (carga y copia guardada), `app.js` (vistas), `graficos.js` (gráficos SVG sin librerías), `excel.js` (Excel sin librerías).
+  `config.js` (solo la URL del script: se completa una vez y no viene en las actualizaciones), `version.js` (versiones: viene en cada actualización), `escuelas-extra.js` (dirección y directora, del equipo), `coordenadas.js` (lat/lng de cada escuela, del mapa de SAE Gestión: solo nombre y coordenadas), `datos.js` (carga y copia guardada), `app.js` (vistas), `graficos.js` (gráficos SVG sin librerías), `excel.js` (Excel sin librerías), `pdf.js` (PDF a color sin librerías, para la Ficha para visita).
 - `apps-script/Codigo.gs` · el script que lee las planillas. Cómo publicarlo: `apps-script/PUBLICAR.md`.
 - `vercel.json` · encabezados de seguridad del kit. `AGENTS.md` · reglas del ecosistema.
 
