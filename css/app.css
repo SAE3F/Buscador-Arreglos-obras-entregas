@@ -448,3 +448,64 @@ html.dark .combo-lista li[aria-selected="true"] b { color: #7fb2ff; }
 .combo-lista li.combo-nada:hover { background: transparent; }
 .combo.combo-error .combo-input { border-color: #d64545; box-shadow: 0 0 0 3px rgba(214,69,69,.18); }
 @media (max-width: 640px) { .combo-input { font-size: 16px; } .combo-lista { max-width: calc(100vw - 2rem); } }
+
+/* ===== v0.6.0 · Celulares (≤ 640px): más conciso ===== */
+.solo-cel { display: none; }
+@media (max-width: 640px) {
+  .solo-pc { display: none !important; }
+  .solo-cel { display: inline; }
+  .btn-ir { display: none !important; }                 /* accesos a planillas */
+
+  /* Detalle / Registros: cada registro es una tarjeta; sin proveedor ni planilla */
+  .tabla-caja { overflow-x: visible; }
+  .tabla-caja table.tabla-fija { min-width: 0 !important; width: 100%; table-layout: auto; }
+  .tabla-fija colgroup, .tabla-fija thead { display: none; }
+  .tabla-fija tbody { display: block; }
+  .tabla-fija tr { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: .55rem; row-gap: .15rem;
+    padding: .65rem .75rem .7rem; border-bottom: 1px solid var(--border); background: var(--bg-card); }
+  .tabla-fija tr[hidden] { display: none; }
+  .tabla-fija td { display: block; height: auto; padding: 0; border: 0; background: transparent !important; box-shadow: none !important;
+    white-space: normal; overflow: visible; text-overflow: clip; font-size: .86rem; }
+  .tabla-fija td.c-prov, .tabla-fija td.c-fuente, .tabla-fija td.c-ir, .tabla-fija td.c-monto, .tabla-fija td.c-fact { display: none; }
+  /* línea 1: tipo · fecha · institución ……… cantidad */
+  .tabla-fija td.c-t { order: 1; font-size: .78rem; }
+  .tabla-fija td.c-fecha { order: 2; font-size: .8rem; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+  .tabla-fija td.c-inst { order: 3; font-weight: 700; font-size: .86rem; }
+  .tabla-fija td.c-cant { order: 4; margin-left: auto; font-weight: 700; font-size: .86rem; white-space: nowrap; }
+  .tabla-fija td.c-cant::before { content: "Cant. "; font-weight: 500; font-size: .72rem; color: var(--text-secondary); }
+  /* línea 2: rubro; línea 3: el detalle completo, sin cortar */
+  .tabla-fija td.c-cat { order: 5; flex-basis: 100%; font-size: .76rem; color: var(--text-secondary); font-weight: 600; }
+  .tabla-fija td.c-det { order: 6; flex-basis: 100%; font-size: .95rem; line-height: 1.38; color: var(--text-primary); overflow-wrap: anywhere; }
+  .tabla-fija td.c-det .muted { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; font-size: .84rem; margin-top: .1rem; }
+  .tabla-fija tr.fila-sub td.c-det .muted { display: none; }
+  .tabla-fija .sangria { display: none; }
+  .tabla-fija tr.fila-hijo.nivel2 .sangria { margin-left: 0; }
+
+  /* grupos por día: los colores pasan a la tarjeta entera */
+  .tabla-fija tr.fila-grupo { background: var(--grupo-bg); box-shadow: inset 4px 0 0 var(--c-A); }
+  .tabla-fija tr.fila-grupo.un { background: var(--un-bg); box-shadow: inset 4px 0 0 var(--un-borde, #7c5cd6); }
+  .tabla-fija tr.fila-grupo.abierto { background: var(--abierto-dia); }
+  .tabla-fija tr.fila-grupo.un.abierto { background: var(--abierto-dia-un); }
+  html:not(.dark) .tabla-fija tr.fila-grupo.abierto { box-shadow: inset 4px 0 0 #F69321; }
+  .tabla-fija tr.fila-sub { background: var(--dentro-sub); box-shadow: inset 4px 0 0 var(--dentro-borde); padding-left: 1.4rem; }
+  .tabla-fija tr.fila-hijo { background: var(--dentro-hijo); box-shadow: inset 4px 0 0 var(--dentro-borde); padding-left: 1.4rem; }
+  .tabla-fija tr.fila-hijo.nivel2 { padding-left: 2.2rem; }
+  /* dentro de un grupo, tipo/fecha/rubro ya están en la fila del día: queda el detalle y la cantidad */
+  .tabla-fija tr.fila-hijo td.c-t, .tabla-fija tr.fila-hijo td.c-fecha, .tabla-fija tr.fila-hijo td.c-cat { display: none; }
+  .tabla-fija tr.fila-hijo td.c-det { order: 3; flex: 1 1 0; min-width: 0; font-size: .9rem; }
+  .tabla-fija tr.fila-hijo:not(.nivel1) td.c-inst { display: none; }
+  .tabla-fija tr.fila-sub td.c-t, .tabla-fija tr.fila-sub td.c-fecha, .tabla-fija tr.fila-sub td.c-cat { display: none; }
+  .tabla-fija tr.fila-grupo:hover, .tabla-fija tr.fila-sub:hover { filter: none; }
+
+  /* tablas que siguen siendo tablas (ranking, calidad…) no se tocan: solo las de registros */
+}
+
+/* "?" de ayuda (Cantidad mínima): mouse, teclado o toque */
+.ayuda { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; margin-left: .25rem;
+  border-radius: 50%; background: var(--primary-light); color: var(--primary); font-size: .68rem; font-weight: 800; cursor: help; text-transform: none; letter-spacing: 0; vertical-align: middle; }
+html.dark .ayuda { color: #7fb2ff; }
+.ayuda:hover::after, .ayuda:focus::after { content: attr(data-ayuda); position: absolute; z-index: 50; left: 50%; top: calc(100% + 6px); transform: translateX(-50%);
+  width: 250px; max-width: 80vw; padding: .55rem .7rem; border-radius: 8px; background: var(--text-primary); color: var(--bg-card);
+  font-size: .78rem; font-weight: 500; line-height: 1.35; box-shadow: 0 8px 22px rgba(0,0,0,.2); white-space: normal; }
+.ayuda:focus { outline: 2px solid var(--primary); outline-offset: 1px; }
+@media (max-width: 640px) { .campo label { position: relative; } .ayuda { position: static; } .ayuda:hover::after, .ayuda:focus::after { left: 0; top: calc(100% + 4px); transform: none; width: 260px; max-width: calc(100vw - 3rem); } }

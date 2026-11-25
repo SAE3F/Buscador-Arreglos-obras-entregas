@@ -380,7 +380,7 @@
       '<div class="ficha-acciones no-print"><button class="btn btn-primary btn-sm" id="fVisita">📄 Ficha para visita</button>' +
       '<a class="btn btn-secondary btn-sm" href="' + esc(urlComoLlegar(i)) + '" target="_blank" rel="noopener" title="Ruta en Google Maps desde la Municipalidad (Alberdi 4840, Caseros)">🧭 Cómo llegar</a>' +
       '<a class="btn btn-secondary btn-sm" href="' + esc(urlMapa(i)) + '" target="_blank" rel="noopener" title="Abrir el mapa de SAE Gestión en esta escuela">🗺️ Ver en el mapa</a>' +
-      menuPlanillas(i, regs) + '<button class="btn btn-secondary btn-sm" id="fLink">🔗 Copiar link</button><button class="btn btn-secondary btn-sm" id="fExcel">⬇️ Excel</button>' +
+      menuPlanillas(i, regs) + '<button class="btn btn-secondary btn-sm" id="fLink">🔗 Copiar link</button><button class="btn btn-secondary btn-sm solo-pc" id="fExcel">⬇️ Excel</button>' +
       '<button class="btn btn-secondary btn-sm" id="fCerrar" title="Volver a la lista">✕</button></div></div></div></article>';
 
     html += '<div class="kpis">' +
@@ -396,7 +396,7 @@
         return '<button role="tab" data-n="' + k + '" aria-selected="' + (recN() === k) + '">' + k + '</button>'; }).join('') + '</div></div></div>' +
       '<div class="card-body"><div id="fRecLista"><div class="esqueleto" style="height:60px"></div></div></div></article>';
 
-    html += '<div class="grilla g2"><article class="card"><div class="card-header"><div><h2>📈 Línea de tiempo</h2><p class="card-subtitle" id="fAnualSub"></p></div>' +
+    html += '<div class="grilla g2 solo-pc"><article class="card"><div class="card-header"><div><h2>📈 Línea de tiempo</h2><p class="card-subtitle" id="fAnualSub"></p></div>' +
       '<div class="fila"><select id="fAnioMes" aria-label="Año a ver por mes" class="' + (S.ficha.escala === 'mes' ? '' : 'oculto') + '"></select>' +
       '<div class="pestanas chicas" id="fEscala" role="tablist"><button role="tab" data-e="anio" aria-selected="' + (S.ficha.escala === 'anio') + '">Por año</button>' +
       '<button role="tab" data-e="mes" aria-selected="' + (S.ficha.escala === 'mes') + '">Por mes</button></div></div></div>' +
@@ -549,7 +549,7 @@
       '<label class="check"><input type="checkbox" data-g="x" data-k="agrupar"' + (o.agrupar ? ' checked' : '') + '> Agrupar los trabajos de un mismo arreglo</label></div></fieldset>' +
       '<fieldset><legend>Reclamos</legend><div class="opciones">' + radio('recN', [[5, 'Últimos 5'], [10, 'Últimos 10'], [20, 'Últimos 20']], o.recN) + '</div><div class="opciones">' + caja('recCols', COLS_R, o.recCols) + '</div></fieldset>' +
       '</div><div class="modal-pie"><span class="chico muted" id="vEstado">El PDF se descarga directo. Imprimir abre la ventana de la impresora.</span>' +
-      '<button class="btn btn-secondary btn-sm" data-cerrar>Cancelar</button><button class="btn btn-primary btn-sm" id="vExcel">⬇️ Excel</button>' +
+      '<button class="btn btn-secondary btn-sm" data-cerrar>Cancelar</button><button class="btn btn-primary btn-sm solo-pc" id="vExcel">⬇️ Excel</button>' +
       '<button class="btn btn-primary btn-sm" id="vImprimir">🖨️ Imprimir</button><button class="btn btn-primary btn-sm" id="vPdf">⬇️ PDF</button></div></div>';
     m.classList.remove('oculto'); document.body.classList.add('con-modal');
     function leer() {
@@ -760,7 +760,7 @@
       items.push([U.nombreHoja(h), n(o.n) + ' ' + (o.n === 1 ? 'registro' : 'registros') + ' · ' + Object.keys(o.tipos).map(function (t) { return T[t].nombre.toLowerCase(); }).join(', '), o.ref]);
     });
     if (!items.length || !Object.keys(Datos.hojas).length) return '';
-    return '<details class="menu-planillas"><summary class="btn btn-secondary btn-sm">📄 Ver en planillas</summary><div class="menu-caja">' +
+    return '<details class="menu-planillas solo-pc"><summary class="btn btn-secondary btn-sm">📄 Ver en planillas</summary><div class="menu-caja">' +
       '<div class="chico muted" style="padding:.2rem .3rem .4rem">Abre la planilla en la primera fila de esta institución. Cada registro del detalle tiene su propio ↗.</div>' +
       items.map(function (x) { return '<div class="menu-item"><div><b>' + esc(x[0]) + '</b><div class="chico muted">' + esc(x[1]) + '</div></div>' + botonIr(x[2], 'Abrir') + '</div>'; }).join('') + '</div></details>';
   }
@@ -909,12 +909,12 @@
     function celda(clase, texto, html) { return '<td class="' + clase + '" title="' + esc(texto) + '">' + (html == null ? esc(texto) : html) + '</td>'; }
     function fila(r, clase, extra) {
       var detTitulo = r.det + (r.serv && r.t !== 'O' ? ' — ' + r.serv : '');
-      return '<tr class="' + (clase || '') + '"' + (extra || '') + '>' + (conInst ? celda('', T[r.t].uno, etiquetaTipo(r.t)) : '') + celda('fecha', String(fechaReg(r))) +
-        (conInst ? celda('inst', r.inst, linkInst(r.inst)) : '') +
-        celda('', r.cat, U.icono(r.cat) + '&nbsp;' + esc(r.cat)) + celda('', detTitulo, (clase && clase.indexOf('fila-hijo') === 0 ? '<span class="sangria">↳</span> ' : '') + esc(r.det)) +
-        celda('num', n(r.cant)) + celda('chico', r.prov) +
-        (m ? celda('num', r.monto == null ? '' : '$ ' + n(r.monto)) + celda('chico', r.fact || '') : '') +
-        celda('fuente', r.fuente) + '<td class="ir">' + botonIr(r.ref) + '</td></tr>';
+      return '<tr class="' + (clase || '') + '"' + (extra || '') + '>' + (conInst ? celda('c-t', T[r.t].uno, etiquetaTipo(r.t)) : '') + celda('fecha c-fecha', String(fechaReg(r))) +
+        (conInst ? celda('inst c-inst', r.inst, linkInst(r.inst)) : '') +
+        celda('c-cat', r.cat, U.icono(r.cat) + '&nbsp;' + esc(r.cat)) + celda('c-det', detTitulo, (clase && clase.indexOf('fila-hijo') === 0 ? '<span class="sangria">↳</span> ' : '') + esc(r.det)) +
+        celda('num c-cant', n(r.cant)) + celda('chico c-prov', r.prov) +
+        (m ? celda('num c-monto', r.monto == null ? '' : '$ ' + n(r.monto)) + celda('chico c-fact', r.fact || '') : '') +
+        celda('fuente c-fuente', r.fuente) + '<td class="ir c-ir">' + botonIr(r.ref) + '</td></tr>';
     }
     function abierto(anc) { return anc.every(function (k) { return ABIERTOS.has(k); }); }
     function attrs(anc) { return anc.length ? ' data-anc="' + esc(anc.join('§')) + '"' + (abierto(anc) ? '' : ' hidden') : ''; }
@@ -925,11 +925,11 @@
       var titulo = g.subs ? (g.nEsc > 1 ? n(g.nEsc) + ' escuelas · ' : '') + g.det : g.det;
       var instHtml = g.subs ? (g.nEsc > 1 ? '<span class="muted">' + n(g.nEsc) + ' escuelas</span>' : linkInst(g.inst)) : linkInst(g.inst);
       var fila0 = '<tr class="' + (g.sub ? 'fila-sub' : 'fila-grupo') + (g.un ? ' un' : '') + (ab ? ' abierto' : '') + '" data-grupo="' + k + '"' + attrs(anc) + ' tabindex="0" aria-expanded="' + ab + '" title="Tocá para ' + (ab ? 'cerrar' : 'abrir') + '">' +
-        (conInst ? celda('', T[g.t].uno, etiquetaTipo(g.t)) : '') + celda('fecha', fechaGrupo(g)) +
-        (conInst ? celda('inst', g.inst || (g.nEsc + ' escuelas'), instHtml) : '') +
-        celda('', g.cat, U.icono(g.cat) + '&nbsp;' + esc(g.cat)) +
-        celda('', titulo + ': ' + resumenDe(g.items), (g.sub ? '<span class="sangria">↳</span> ' : '') + '<span class="flecha-grupo">▸</span> <b>' + esc(titulo) + '</b> <span class="muted">· ' + esc(resumenDe(g.items)) + '</span>') +
-        celda('num', n(g.cant)) + celda('chico', g.prov) + (m ? '<td></td><td></td>' : '') + celda('fuente', g.fuente) + '<td class="ir"></td></tr>';
+        (conInst ? celda('c-t', T[g.t].uno, etiquetaTipo(g.t)) : '') + celda('fecha c-fecha', fechaGrupo(g)) +
+        (conInst ? celda('inst c-inst', g.inst || (g.nEsc + ' escuelas'), instHtml) : '') +
+        celda('c-cat', g.cat, U.icono(g.cat) + '&nbsp;' + esc(g.cat)) +
+        celda('c-det', titulo + ': ' + resumenDe(g.items), (g.sub ? '<span class="sangria">↳</span> ' : '') + '<span class="flecha-grupo">▸</span> <b>' + esc(titulo) + '</b> <span class="muted">· ' + esc(resumenDe(g.items)) + '</span>') +
+        celda('num c-cant', n(g.cant)) + celda('chico c-prov', g.prov) + (m ? '<td class="c-monto"></td><td class="c-fact"></td>' : '') + celda('fuente c-fuente', g.fuente) + '<td class="ir c-ir"></td></tr>';
       var anc2 = anc.concat([g.key]);
       var cu = g.un ? ' un' : '';
       return fila0 + hijos.map(function (h) { return h.grupo ? grupo(h, anc2) : fila(h, (g.sub ? 'fila-hijo nivel2' : g.subs ? 'fila-hijo nivel1' : 'fila-hijo') + cu, attrs(anc2)); }).join('');
@@ -1374,7 +1374,7 @@
       '<div class="kpi"><div class="et">🏫 Fuera de ESTABLECIMIENTOS</div><div class="val">' + n(fuera) + '</div><div class="sub">instituciones con registros</div></div>' +
       '<div class="kpi"><div class="et">✏️ Nombres unificados</div><div class="val">' + n(alias) + '</div><div class="sub">no hace falta hacer nada</div></div></div>';
     html += '<article class="card"><div class="card-header"><div><h2>🩺 Problemas por tipo</h2><p class="card-subtitle">' + n(Lf.length) + ' avisos' + (S.calHoja ? ' en ' + esc(U.nombreHoja(S.calHoja)) : '') + '</p></div>' +
-      '<button class="btn btn-secondary btn-sm" id="cExcel">⬇️ Excel</button></div><div class="card-body">' +
+      '<button class="btn btn-secondary btn-sm solo-pc" id="cExcel">⬇️ Excel</button></div><div class="card-body">' +
       '<div class="campo" style="margin-bottom:.8rem"><label>Planilla</label><div class="chips" id="cHojas"><button class="chip" data-h="" aria-pressed="' + !S.calHoja + '">Todas</button>' +
       hojas.sort(function (a, b) { return ordenEs(U.nombreHoja(a), U.nombreHoja(b)); }).map(function (h) {
         return '<button class="chip" data-h="' + esc(h) + '" aria-pressed="' + (S.calHoja === h) + '">' + esc(U.nombreHoja(h)) + ' <span class="n">' + L.filter(function (x) { return x.h === h; }).length + '</span></button>';
