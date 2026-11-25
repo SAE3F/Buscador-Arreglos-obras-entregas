@@ -394,3 +394,26 @@ tr.fila-sub.abierto .flecha-grupo { transform: rotate(90deg); }
 :root { --grupo-sub: #eef9f3; }
 html.dark { --grupo-sub: #133026; }
 .tabla-fija tr.fila-hijo.nivel2 .sangria { margin-left: 2rem; }
+
+/* ── v0.5.4 · grupos de FACTURACION UNIDADES en violeta */
+:root { --un-bg: #efe9fb; --un-hover: #e4dbf8; --un-sub: #f4f0fc; --un-hijo: #faf8fe; --un-borde: #7c5cd6; }
+html.dark { --un-bg: #2a2142; --un-hover: #33284f; --un-sub: #251d3a; --un-hijo: #1d1830; --un-borde: #9b7ff0; }
+.tabla-fija tr.fila-grupo.un td { background: var(--un-bg); }
+.tabla-fija tr.fila-sub.un td { background: var(--un-sub); }
+.tabla-fija tr.fila-grupo.un:hover td, .tabla-fija tr.fila-sub.un:hover td { background: var(--un-hover); }
+.tabla-fija tr.fila-hijo.un td { background: var(--un-hijo); }
+.tabla-fija tr.un td:first-child { box-shadow: inset 4px 0 0 var(--un-borde); }
+tr.un .flecha-grupo { color: var(--un-borde); }
+.impr tr.grupo.un td { background: #f1ecfb; }
+/* Día abierto: la fila del día se resalta y lo de adentro (escuelas y trabajos) va en azul grisáceo */
+:root { --abierto-dia: #fde2bd; --abierto-dia-un: #fde2bd; --dentro-sub: #e6eef9; --dentro-hijo: #f5f8fc; --dentro-borde: #2a78d6; }
+html.dark { --abierto-dia: #1d5a42; --abierto-dia-un: #44366b; --dentro-sub: #1b2a3f; --dentro-hijo: #152131; --dentro-borde: #3987e5; }
+.tabla-fija tr.fila-grupo.abierto td { background: var(--abierto-dia); font-weight: 600; }
+.tabla-fija tr.fila-grupo.un.abierto td { background: var(--abierto-dia-un); }
+.tabla-fija tr.fila-sub td, .tabla-fija tr.fila-sub.un td { background: var(--dentro-sub); }
+.tabla-fija tr.fila-sub.abierto td { background: var(--dentro-sub); font-weight: 600; }
+.tabla-fija tr.fila-hijo td, .tabla-fija tr.fila-hijo.un td { background: var(--dentro-hijo); }
+.tabla-fija tr.fila-sub td:first-child, .tabla-fija tr.fila-hijo td:first-child { box-shadow: inset 4px 0 0 var(--dentro-borde); }
+.tabla-fija tr.fila-sub:hover td, .tabla-fija tr.fila-hijo:hover td { background: var(--primary-light); }
+/* Modo claro: el día abierto va en naranja suave 3F con borde naranja, bien distinto del verde/violeta */
+html:not(.dark) .tabla-fija tr.fila-grupo.abierto td:first-child { box-shadow: inset 4px 0 0 #F69321; }

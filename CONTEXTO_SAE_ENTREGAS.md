@@ -100,14 +100,14 @@ vercel.json, AGENTS.md, assets/ (del kit), README.md
 ## 5. Estado actual (24/11/2026)
 
 - **Propósito:** buscador resumido de todo lo hecho en cada escuela, para ver, imprimir o descargar antes o durante una visita.
-- **Página:** versión **0.5.3** entregada el 25/11/2026 (zip con archivos cambiados sobre la 0.5.1 completa: incluye lo de 0.5.2). Título: **Ficha Escuelas**.
+- **Página:** versión **0.5.4** entregada el 25/11/2026 (zip con archivos cambiados sobre la 0.5.3). Título: **Ficha Escuelas**.
   Falta confirmar que se subió y que se publicó el Apps Script 1.2.0.
 - **Apps Script:** versión **1.2.0** entregada (agrega reclamos). Hay que publicarla como Nueva versión. Antes estaba la 1.1.0 publicada como aplicación web ("Ejecutar como: Yo", "Cualquier persona"). La URL está en el `js/config.js` de la persona usuaria.
-- Historial: 0.1.0 (primera versión) → 0.1.1 (tablas de ancho fijo, una línea) → 0.2.0 (script 1.1.0: ir a la celda, calidad por problema, ranking Menos/Sin registros, "Sin tipo" al final, encabezados verticales) → 0.3.0 (copiar link con respaldo, aviso clicable, version.js, 12 filtros nuevos, tabla institución × categoría con columnas fijas, info de proveedores) → 0.4.0 (equipo: "Ficha Escuelas", escuelas-extra.js) → 0.5.0 (script 1.2.0: reclamos en la ficha, cómo llegar y ver en el mapa, ficha para visita con opciones e impresión numerada, arreglos agrupados desplegables, filtros nuevos en Vista general / Registros / Calidad con etiquetas ✕ y link con filtros, localidades en mayúsculas, CUE sin ".0") → 0.5.1 (arreglos agrupados solo de FACTURACION ITEMS) → 0.5.2 (grupos en verde; Ficha para visita: botón **PDF a color** que descarga directo (js/pdf.js, sin librerías) y botón **Imprimir en blanco y negro**; sin "Cómo llegar" en impresión/PDF; reclamos pedidos de antemano para que sea rápido) → 0.5.3 (arreglos agrupados por día; en Registros con subgrupo por escuela).
+- Historial: 0.1.0 (primera versión) → 0.1.1 (tablas de ancho fijo, una línea) → 0.2.0 (script 1.1.0: ir a la celda, calidad por problema, ranking Menos/Sin registros, "Sin tipo" al final, encabezados verticales) → 0.3.0 (copiar link con respaldo, aviso clicable, version.js, 12 filtros nuevos, tabla institución × categoría con columnas fijas, info de proveedores) → 0.4.0 (equipo: "Ficha Escuelas", escuelas-extra.js) → 0.5.0 (script 1.2.0: reclamos en la ficha, cómo llegar y ver en el mapa, ficha para visita con opciones e impresión numerada, arreglos agrupados desplegables, filtros nuevos en Vista general / Registros / Calidad con etiquetas ✕ y link con filtros, localidades en mayúsculas, CUE sin ".0") → 0.5.1 (arreglos agrupados solo de FACTURACION ITEMS) → 0.5.2 (grupos en verde; Ficha para visita: botón **PDF a color** que descarga directo (js/pdf.js, sin librerías) y botón **Imprimir en blanco y negro**; sin "Cómo llegar" en impresión/PDF; reclamos pedidos de antemano para que sea rápido) → 0.5.3 (arreglos agrupados por día; en Registros con subgrupo por escuela) → 0.5.4 (FACTURACION UNIDADES agrupado en violeta; botones Excel/Imprimir/PDF en azul oscuro; día abierto resaltado con otro color).
 
 ## 6. Pendientes y temas abiertos
 
-- **Siguiente etapa (acordada 25/11/2026): optimización para celulares**, después de revisar juntos que la 0.5.0 funcione bien.
+- **Siguiente etapa (acordada 25/11/2026): optimización para celulares**, después de revisar juntos que la 0.5.4 funcione bien.
 - **Para revisar con el equipo:** (a) `js/escuelas-extra.js` tiene **nombres de directoras/es en el repo público** (el kit pide no
   publicar datos personales); lo prolijo sería traerlos desde una planilla vía Apps Script; (b) sacar del repo `LINK_APPSCRIPT_SAE_ENTREGAS.txt`,
   el zip y el contexto viejo; (c) `js/config.js` con la URL del script queda público (sin clave, decisión del equipo).
@@ -122,10 +122,10 @@ vercel.json, AGENTS.md, assets/ (del kit), README.md
 - Reclamos: **solo lectura**, en un **apartado propio de la ficha** ("📣 Últimos reclamos", no pestaña), últimos **5/10/20** a elección,
   **sin clave** en el script, **sin gráficos de reclamos** en la Vista general (la página es de entregas, obras y arreglos).
 - Cómo llegar: **desde la Municipalidad de Tres de Febrero (Alberdi 4840, Caseros)**, con coordenadas (respaldo: dirección).
-- Arreglos agrupados: **solo FACTURACION ITEMS**, **cada día por separado**. En **Registros**: día + rubro + proveedor → subgrupo por escuela → trabajos.
-  En la **ficha** del buscador y en la **Ficha para visita** (una sola escuela): día + rubro + proveedor → trabajos. Todo en verde, desplegable.
+- Agrupados: **FACTURACION ITEMS** (verde) y **FACTURACION UNIDADES** (violeta; incluye entregas Utensilios/Equipamiento y arreglos Canaletas/Atmosférico), **cada día por separado**. En **Registros**: día + rubro + proveedor → subgrupo por escuela → trabajos.
+  En la **ficha** del buscador y en la **Ficha para visita** (una sola escuela): día + rubro + proveedor → trabajos. Desplegable. Al abrir un día: la fila del día se resalta (modo claro naranja suave con borde naranja; modo oscuro verde/violeta más intenso) y lo de adentro va en azul grisáceo con borde azul.
 - Ficha para visita: se elige apartados, columnas, período (todo / 12 meses / lo filtrado) y formato (resumida = últimos 10 / completa);
-  hojas numeradas abajo a la izquierda ("Hoja X de Y"). **PDF siempre a color** (descarga directa) e **Imprimir siempre en blanco y negro**.
+  hojas numeradas abajo a la izquierda ("Hoja X de Y"). **PDF siempre a color** (descarga directa) e **Imprimir siempre en blanco y negro**. Botones: Cancelar (secundario) y **⬇️ Excel / 🖨️ Imprimir / ⬇️ PDF** en azul oscuro (primario).
   **Sin "Cómo llegar"** en impresión/PDF (el botón en pantalla y el Excel lo mantienen).
 - Un arreglo de un solo trabajo queda como fila suelta (no hay nada que agrupar); en Registros, dentro del día, una escuela con un solo trabajo aparece directo.
 
@@ -161,3 +161,6 @@ vercel.json, AGENTS.md, assets/ (del kit), README.md
 - **25/11/2026:** **0.5.2**: grupos en verde, PDF a color directo, Imprimir en B/N, sin "Cómo llegar" en lo impreso, reclamos precargados.
 - **25/11/2026:** pendiente: agrupar arreglos por día (+ rubro + proveedor) con subgrupo por escuela; días separados.
 - **25/11/2026:** **0.5.3**: arreglos agrupados por día (+ rubro + proveedor), en Registros con subgrupo por escuela; días separados.
+- **25/11/2026:** pendiente: botones de la Ficha para visita sin "blanco y negro"/"a color" y todos en azul oscuro.
+- **25/11/2026:** pendiente: agrupar FACTURACION UNIDADES por día (otro color).
+- **25/11/2026:** **0.5.4**: FACTURACION UNIDADES agrupado igual que ITEMS en violeta (incluye entregas); botones de la Ficha para visita renombrados y en azul oscuro; día abierto resaltado (claro: naranja suave) y contenido en azul grisáceo. Script sigue 1.2.0.

@@ -432,7 +432,7 @@
   }
   function listaTipo(regs, t, o) {
     var l = regs.filter(function (r) { return r.t === t; });
-    if (t === 'A' && o.agrupar) l = agruparArreglos(l);
+    if (t !== 'O' && o.agrupar) l = agruparArreglos(l);
     return l.sort(function (a, b) { return a.orden < b.orden ? 1 : a.orden > b.orden ? -1 : 0; });
   }
   function abrirVisita(i, regs) {
@@ -447,9 +447,9 @@
       '<fieldset><legend>Columnas de entregas, obras y arreglos</legend><div class="opciones">' + caja('cols', COLS_V, o.cols) +
       '<label class="check"><input type="checkbox" data-g="x" data-k="agrupar"' + (o.agrupar ? ' checked' : '') + '> Agrupar los trabajos de un mismo arreglo</label></div></fieldset>' +
       '<fieldset><legend>Reclamos</legend><div class="opciones">' + radio('recN', [[5, 'Últimos 5'], [10, 'Últimos 10'], [20, 'Últimos 20']], o.recN) + '</div><div class="opciones">' + caja('recCols', COLS_R, o.recCols) + '</div></fieldset>' +
-      '</div><div class="modal-pie"><span class="chico muted" id="vEstado">El PDF se descarga a color. Imprimir abre la impresora en blanco y negro.</span>' +
-      '<button class="btn btn-secondary btn-sm" data-cerrar>Cancelar</button><button class="btn btn-secondary btn-sm" id="vExcel">⬇️ Excel</button>' +
-      '<button class="btn btn-secondary btn-sm" id="vImprimir">🖨️ Imprimir (blanco y negro)</button><button class="btn btn-primary btn-sm" id="vPdf">⬇️ PDF a color</button></div></div>';
+      '</div><div class="modal-pie"><span class="chico muted" id="vEstado">El PDF se descarga directo. Imprimir abre la ventana de la impresora.</span>' +
+      '<button class="btn btn-secondary btn-sm" data-cerrar>Cancelar</button><button class="btn btn-primary btn-sm" id="vExcel">⬇️ Excel</button>' +
+      '<button class="btn btn-primary btn-sm" id="vImprimir">🖨️ Imprimir</button><button class="btn btn-primary btn-sm" id="vPdf">⬇️ PDF</button></div></div>';
     m.classList.remove('oculto'); document.body.classList.add('con-modal');
     function leer() {
       var r = { sec: {}, cols: {}, recCols: {} };
@@ -523,7 +523,7 @@
           var v = { fecha: r.grupo ? fechaGrupo(r) : String(fechaReg(r)), cat: r.cat,
             det: r.grupo ? r.det + ': ' + r.items.map(function (x) { return x.det.replace(/:\s*$/, '') + (x.cant > 1 ? ' (' + x.cant + ')' : ''); }).join(' · ') : r.det,
             cant: n(r.cant), prov: r.prov, fuente: r.fuente };
-          var f = cols.map(function (c) { return v[c[0]] || ''; }); f.grupo = !!r.grupo; return f;
+          var f = cols.map(function (c) { return v[c[0]] || ''; }); f.grupo = !!r.grupo; f.un = !!r.un; return f;
         }),
         mas: l.length > vis.length ? '… y ' + n(l.length - vis.length) + ' más (elegí “Completa” para verlos todos).' : '' });
     });
@@ -542,7 +542,7 @@
         else {
           if (S2.nota) h += '<p class="chico">' + esc(S2.nota) + '</p>';
           if (S2.filas.length) h += '<table><thead><tr>' + S2.cols.map(function (c) { return '<th' + (c.der ? ' class="num"' : '') + '>' + esc(c.t) + '</th>'; }).join('') + '</tr></thead><tbody>' +
-            S2.filas.map(function (f) { return '<tr' + (f.grupo ? ' class="grupo"' : '') + '>' + f.map(function (v, k) { var c = S2.cols[k];
+            S2.filas.map(function (f) { return '<tr' + (f.grupo ? ' class="grupo' + (f.un ? ' un' : '') + '"' : '') + '>' + f.map(function (v, k) { var c = S2.cols[k];
               return '<td' + (c.der ? ' class="num"' : c.k === 'fecha' || c.k === 'res' ? ' class="nw"' : '') + '>' + esc(v) + '</td>'; }).join('') + '</tr>'; }).join('') + '</tbody></table>';
           if (S2.mas) h += '<p class="chico">' + esc(S2.mas) + '</p>';
         }
@@ -611,7 +611,7 @@
           if (S2.filas.length) {
             d.y += 2;
             var anchos = { fecha: 1.1, cat: 1.5, det: 4.2, cant: 0.75, prov: 1.7, fuente: 1.6, estado: 1, tema: 2.2, res: 1.3, resp: 1.1, acc: 2.2 };
-            var filas = S2.filas.map(function (f) { var c = f.slice(); if (f.grupo) { c.fondo = '#eaf7f1'; c.negrita = true; } if (f.estado) c.fondo = COLEST[f.estado]; return c; });
+            var filas = S2.filas.map(function (f) { var c = f.slice(); if (f.grupo) { c.fondo = f.un ? '#f1ecfb' : '#eaf7f1'; c.negrita = true; } if (f.estado) c.fondo = COLEST[f.estado]; return c; });
             d.tabla(S2.cols.map(function (c) { return { t: c.t, w: anchos[c.k] || 1.2, der: c.der }; }), filas, { tam: 7.8 });
           }
           if (S2.mas) d.parrafo(S2.mas, { tam: 8, color: '#555555' });
@@ -689,14 +689,14 @@
       if (!r.fecha && (F.mes || rg)) sinF++;
       return true;
     });
-    var lista = t === 'A' ? agruparArreglos(rs) : rs.slice();
+    var lista = t !== 'O' ? agruparArreglos(rs) : rs.slice();
     lista.sort(function (a, b) { return a.orden < b.orden ? 1 : a.orden > b.orden ? -1 : 0; });
     if (F.orden === 'viejo') lista.reverse();
     else if (F.orden === 'cant') lista.sort(function (a, b) { return b.cant - a.cant || (a.orden < b.orden ? 1 : -1); });
     var u = rs.reduce(function (s, r) { return s + r.cant; }, 0);
     $('#fSub').textContent = n(rs.length) + ' ' + T[t].nombre.toLowerCase() + (t !== 'O' ? ' · ' + n(u) + ' unidades' : '') + (rs.length !== base.length ? ' (filtrado de ' + n(base.length) + ')' : '') +
       (sinF ? ' · ' + n(sinF) + ' sin fecha exacta incluidos por año' : '') +
-      (lista.length < rs.length ? ' · agrupados en ' + n(lista.length) + ' arreglos (tocá uno para ver sus trabajos)' : '');
+      (lista.length < rs.length ? ' · agrupados por día en ' + n(lista.length) + ' filas (tocá una para ver el detalle)' : '');
     $$('.kpi[data-kpi]').forEach(function (k) { k.onclick = function () { S.ficha.tab = k.dataset.kpi; S.ficha.cat = ''; S.ficha.prov = ''; pintarFicha(); $('#fTabla').scrollIntoView({ behavior: 'smooth', block: 'center' }); }; });
     $('#fTabla').innerHTML = lista.length ? tablaRegs(lista, false) : '<div class="vacio"><span class="grande">' + T[t].icono + '</span>No hay ' + T[t].nombre.toLowerCase() + ' con estos filtros</div>';
   }
@@ -754,22 +754,22 @@
   }
 
   /** Tabla de registros (ficha y vista Registros) */
-  // ── Arreglos agrupados (solo FACTURACION ITEMS), cada día por separado:
+  // ── Agrupados (FACTURACION ITEMS en verde y FACTURACION UNIDADES en violeta), cada día por separado:
   //    · en la ficha (una escuela): día + rubro + proveedor → trabajos
   //    · en Registros (todas): día + rubro + proveedor → escuela → trabajos   (porEscuela = true)
   var ABIERTOS = new Set();          // grupos desplegados (se mantienen al refiltrar)
   function diasEntre(a, b) { return Math.round((Date.parse(b) - Date.parse(a)) / 86400000); }
   function hacerGrupo(items, key, extra) {
     var p = items[0];
-    var g = { grupo: true, key: key, t: 'A', inst: p.inst, I: p.I, cat: p.cat, prov: p.prov, fuente: p.fuente, fecha: p.fecha, desde: p.fecha, anio: p.anio, orden: p.fecha,
+    var g = { grupo: true, key: key, t: p.t, un: p.fuente === 'FACTURACION UNIDADES', inst: p.inst, I: p.I, cat: p.cat, prov: p.prov, fuente: p.fuente, fecha: p.fecha, desde: p.fecha, anio: p.anio, orden: p.fecha,
       cant: items.reduce(function (s, r) { return s + r.cant; }, 0), det: items.length + (items.length === 1 ? ' trabajo' : ' trabajos'), items: items, ref: p.ref, monto: null, fact: '' };
     return Object.assign(g, extra || {});
   }
   function agruparArreglos(rs, porEscuela) {
     var aparte = [], porDia = new Map();
     rs.forEach(function (r) {
-      if (r.t !== 'A' || !r.fecha || r.fuente !== 'FACTURACION ITEMS') { aparte.push(r); return; }
-      var k = r.fecha + '|' + r.cat + '|' + r.prov + (porEscuela ? '' : '|' + r.inst);
+      if (!r.fecha || (r.fuente !== 'FACTURACION ITEMS' && r.fuente !== 'FACTURACION UNIDADES')) { aparte.push(r); return; }
+      var k = r.fecha + '|' + r.t + '|' + r.fuente + '|' + r.cat + '|' + r.prov + (porEscuela ? '' : '|' + r.inst);
       var l = porDia.get(k); if (!l) porDia.set(k, l = []); l.push(r);
     });
     var out = aparte.slice();
@@ -823,14 +823,15 @@
       var ab = ABIERTOS.has(g.key), k = esc(g.key), hijos = g.subs || g.items;
       var titulo = g.subs ? (g.nEsc > 1 ? n(g.nEsc) + ' escuelas · ' : '') + g.det : g.det;
       var instHtml = g.subs ? (g.nEsc > 1 ? '<span class="muted">' + n(g.nEsc) + ' escuelas</span>' : linkInst(g.inst)) : linkInst(g.inst);
-      var fila0 = '<tr class="' + (g.sub ? 'fila-sub' : 'fila-grupo') + (ab ? ' abierto' : '') + '" data-grupo="' + k + '"' + attrs(anc) + ' tabindex="0" aria-expanded="' + ab + '" title="Tocá para ' + (ab ? 'cerrar' : 'abrir') + '">' +
-        (conInst ? celda('', 'Arreglo', etiquetaTipo('A')) : '') + celda('fecha', fechaGrupo(g)) +
+      var fila0 = '<tr class="' + (g.sub ? 'fila-sub' : 'fila-grupo') + (g.un ? ' un' : '') + (ab ? ' abierto' : '') + '" data-grupo="' + k + '"' + attrs(anc) + ' tabindex="0" aria-expanded="' + ab + '" title="Tocá para ' + (ab ? 'cerrar' : 'abrir') + '">' +
+        (conInst ? celda('', T[g.t].uno, etiquetaTipo(g.t)) : '') + celda('fecha', fechaGrupo(g)) +
         (conInst ? celda('inst', g.inst || (g.nEsc + ' escuelas'), instHtml) : '') +
         celda('', g.cat, U.icono(g.cat) + '&nbsp;' + esc(g.cat)) +
         celda('', titulo + ': ' + resumenDe(g.items), (g.sub ? '<span class="sangria">↳</span> ' : '') + '<span class="flecha-grupo">▸</span> <b>' + esc(titulo) + '</b> <span class="muted">· ' + esc(resumenDe(g.items)) + '</span>') +
         celda('num', n(g.cant)) + celda('chico', g.prov) + (m ? '<td></td><td></td>' : '') + celda('fuente', g.fuente) + '<td class="ir"></td></tr>';
       var anc2 = anc.concat([g.key]);
-      return fila0 + hijos.map(function (h) { return h.grupo ? grupo(h, anc2) : fila(h, g.sub ? 'fila-hijo nivel2' : g.subs ? 'fila-hijo nivel1' : 'fila-hijo', attrs(anc2)); }).join('');
+      var cu = g.un ? ' un' : '';
+      return fila0 + hijos.map(function (h) { return h.grupo ? grupo(h, anc2) : fila(h, (g.sub ? 'fila-hijo nivel2' : g.subs ? 'fila-hijo nivel1' : 'fila-hijo') + cu, attrs(anc2)); }).join('');
     }
     return '<table class="tabla-fija" style="min-width:' + minimo + 'px"><colgroup>' + cols.map(function (c) { return '<col' + (c[3] ? ' style="width:' + c[3] + 'px"' : '') + '>'; }).join('') +
       '</colgroup><thead><tr>' + cols.map(function (c) {
@@ -1206,7 +1207,7 @@
     });
     var u = sueltos.reduce(function (s, x) { return s + x.cant; }, 0), nGr = rs.filter(function (x) { return x.grupo; }).length;
     $('#rSub').textContent = n(sueltos.length) + ' registros · ' + n(u) + ' unidades' + (sueltos.length !== Datos.regs.length ? ' (de ' + n(Datos.regs.length) + ')' : '') +
-      (nGr ? ' · ' + n(nGr) + ' arreglos agrupados (tocá uno para ver sus trabajos)' : '');
+      (nGr ? ' · ' + n(nGr) + ' grupos por día (tocá uno para ver el detalle)' : '');
     var pags = Math.max(1, Math.ceil(rs.length / POR_PAGINA)); if (r.pag >= pags) r.pag = pags - 1;
     var vis = rs.slice(r.pag * POR_PAGINA, (r.pag + 1) * POR_PAGINA);
     $('#rTabla').innerHTML = vis.length ? tablaRegs(vis, true, { col: col, dir: dir }) : '<div class="vacio"><span class="grande">🔍</span>No hay registros con estos filtros</div>';
