@@ -11,7 +11,7 @@
  * (Implementar → Administrar implementaciones → editar → Nueva versión).
  */
 
-var VERSION_SCRIPT = '1.2.0';
+var VERSION_SCRIPT = '1.3.0';
 
 // ─────────────────────────────── Planillas ───────────────────────────────
 var PLANILLAS = {
@@ -40,7 +40,12 @@ var MAX_RECLAMOS = 20;
 var INCLUIR_MONTOS = false;
 
 // Minutos que se guarda la respuesta armada (para que abra rápido). ?actualizar=1 la rehace.
+// Con la actualización automática prendida (ver activarActualizacionAutomatica) se guarda 6 h (lo máximo de Google)
+// y se rehace sola cada hora, así la página siempre abre rápido y los datos tienen como mucho 1 hora.
 var MINUTOS_CACHE = 10;
+var MINUTOS_CACHE_AUTO = 360;
+function autoPrendida_() { try { return PropertiesService.getScriptProperties().getProperty('auto_hora') === '1'; } catch (e) { return false; } }
+function minutosCache_() { return autoPrendida_() ? MINUTOS_CACHE_AUTO : MINUTOS_CACHE; }
 
 // Nombres escritos distinto en las planillas → nombre correcto. Se puede ampliar sin miedo.
 // Los que no coinciden con ESTABLECIMIENTOS aparecen en la página, pestaña "Calidad de datos".
@@ -80,6 +85,29 @@ function doGet(e) {
   }
 }
 
+// ─────────────────────────────── Actualización automática ───────────────────────────────
+/**
+ * EJECUTAR UNA SOLA VEZ desde el editor (elegí la función arriba y tocá ▶ Ejecutar; Google pide permiso la primera vez).
+ * Crea un activador que rehace los datos y los reclamos cada hora (también de noche).
+ */
+function activarActualizacionAutomatica() {
+  desactivarActualizacionAutomatica();
+  ScriptApp.newTrigger('actualizarAutomatico').timeBased().everyHours(1).create();
+  PropertiesService.getScriptProperties().setProperty('auto_hora', '1');
+  actualizarAutomatico();
+  Logger.log('Listo: los datos se van a rehacer solos cada hora.');
+}
+/** Para apagarla (vuelve a la copia de 10 minutos). */
+function desactivarActualizacionAutomatica() {
+  ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'actualizarAutomatico') ScriptApp.deleteTrigger(t); });
+  PropertiesService.getScriptProperties().deleteProperty('auto_hora');
+}
+/** Lo corre el activador: arma los datos y los reclamos y los deja guardados. */
+function actualizarAutomatico() {
+  guardarCache_(JSON.stringify(construirDatos(leerHojas_())));
+  try { reclamosDe_('_', true); } catch (e) { Logger.log('Reclamos: ' + e); }
+}
+
 /** Para probar desde el editor: Ejecutar → probar. Mirá el resultado en "Registro de ejecución". */
 function probar() {
   var d = construirDatos(leerHojas_());
@@ -117,7 +145,7 @@ function guardarCache_(texto) {
     for (var i = 0; i < texto.length; i += T) trozos.push(texto.substring(i, i + T));
     var o = { 'sae_n': String(trozos.length), 'sae_v': VERSION_SCRIPT };
     trozos.forEach(function (t, i) { o['sae_' + i] = t; });
-    c.putAll(o, MINUTOS_CACHE * 60);
+    c.putAll(o, minutosCache_() * 60);
   } catch (e) {}
 }
 function leerCache_() {
@@ -148,9 +176,9 @@ function reclamosDe_(nombre, rehacer) {
   try {
     for (var i = 0; i < claves.length; i += 50) {
       var o = {}; claves.slice(i, i + 50).forEach(function (k) { o['rec_' + k] = JSON.stringify(porInst[k]); });
-      c.putAll(o, MINUTOS_CACHE * 60);
+      c.putAll(o, minutosCache_() * 60);
     }
-    c.put('rec_listo', VERSION_SCRIPT, MINUTOS_CACHE * 60);
+    c.put('rec_listo', VERSION_SCRIPT, minutosCache_() * 60);
   } catch (e) {}
   return { ok: true, version: VERSION_SCRIPT, inst: id, reclamos: porInst[id] || { total: 0, abiertos: 0, items: [] } };
 }
@@ -227,6 +255,7 @@ function construirDatos(h) {
     ok: true,
     version: VERSION_SCRIPT,
     generado: new Date().toISOString(),
+    auto: autoPrendida_(),
     montos: INCLUIR_MONTOS,
     resumen: { entregas: res.E, obras: res.O, arreglos: res.A, instituciones: lista.length },
     hojas: h.meta || {},

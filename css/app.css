@@ -544,3 +544,28 @@ html:not(.dark) .tabla-fija tr.fila-hijo:hover td { background: #e0e4ea; }
   html:not(.dark) .tabla-fija tr.fila-sub { box-shadow: inset 5px 0 0 #c99a00; }
   html:not(.dark) .tabla-fija tr.fila-hijo { box-shadow: inset 5px 0 0 #64748b; }
 }
+
+/* ===== v0.7.0 ===== */
+/* Datos al día: naranja si tienen más de 2 h, gris sin internet; en celular se ve la versión corta ("3 h") */
+.estado-datos.viejo .punto { background: var(--accent); }
+.estado-datos.viejo .txt { color: #b5650d; font-weight: 600; }
+html.dark .estado-datos.viejo .txt { color: #f6a54a; }
+.estado-datos.offline .punto { background: var(--text-muted); box-shadow: 0 0 0 2px rgba(120,130,145,.25); }
+.estado-datos.offline .txt { font-weight: 600; }
+@media (max-width: 768px) {
+  .estado-datos::after { content: attr(data-corto); font-size: .72rem; font-weight: 600; color: var(--text-secondary); }
+  .estado-datos.viejo::after { color: #b5650d; }
+  html.dark .estado-datos.viejo::after { color: #f6a54a; }
+}
+
+/* Reclamo ↔ arreglo */
+.rec-rel { margin-top: .4rem; padding: .4rem .55rem; border-radius: 8px; background: var(--primary-light); font-size: .8rem; line-height: 1.4; display: flex; flex-direction: column; gap: .2rem; }
+html:not(.dark) .rec-rel { background: #eaf2fc; border: 1px dashed #9cbde6; }
+html.dark .rec-rel { background: rgba(57,135,229,.12); border: 1px dashed rgba(57,135,229,.45); }
+
+/* Buscar por cosa: campo más ancho */
+.campo.campo-cosa { flex: 2 1 260px; }
+@media (max-width: 768px) { .campo.campo-cosa { min-width: 100%; } }
+
+/* Celular: en el encabezado se ve "3 h" en vez de la palabra Actualizar */
+@media (max-width: 480px) { #btnActualizar .txt-largo { display: none; } }

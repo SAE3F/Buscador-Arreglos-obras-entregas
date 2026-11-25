@@ -9,6 +9,13 @@
   <title>Ficha Escuelas · Entregas, obras y arreglos</title>
   <meta name="robots" content="noindex, nofollow">
   <link rel="icon" type="image/png" href="assets/logo_3f_chico.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#163C68">
+  <link rel="apple-touch-icon" href="assets/icono-apple-180.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Ficha Escuelas">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -34,6 +41,7 @@
       </div>
       <div class="header-acciones">
         <span class="estado-datos" id="estadoDatos" title="Estado de los datos"><span class="punto"></span><span class="txt">Cargando…</span></span>
+        <button type="button" class="btn btn-secondary btn-sm oculto" id="btnInstalar" title="Instalar la página como app en este dispositivo (funciona sin internet)">📲 <span class="txt-largo">Instalar</span></button>
         <button type="button" class="btn btn-secondary btn-sm" id="btnActualizar" title="Volver a leer las planillas">🔄 <span class="txt-largo">Actualizar</span></button>
         <button type="button" class="btn btn-secondary btn-icono" id="btnModo" aria-label="Cambiar a modo oscuro" title="Modo oscuro">🌙</button>
       </div>
@@ -63,6 +71,8 @@
             <div class="sugerencias oculto" id="sugerencias" role="listbox"></div>
           </div>
           <div class="filtros" style="margin-top:.8rem">
+            <div class="campo campo-cosa"><label for="bCosa">Buscar por cosa <span class="ayuda" tabindex="0" role="button" aria-label="Qué es: Escribí algo que se entregó o arregló (termotanque, heladera, ollas, canilla…) y la lista muestra solo las escuelas que lo tuvieron, cuántas veces y la última vez. Al abrir una escuela, el detalle ya viene filtrado." data-ayuda="Escribí algo que se entregó o arregló (termotanque, heladera, ollas, canilla…) y la lista muestra solo las escuelas que lo tuvieron, cuántas veces y la última vez. Al abrir una escuela, el detalle ya viene filtrado.">?</span></label>
+              <input type="search" id="bCosa" placeholder="ej. termotanque, heladera, ollas" autocomplete="off"></div>
             <div class="campo"><label for="bNivel">Nivel</label><select id="bNivel"></select></div>
             <div class="campo"><label for="bGestion">Gestión</label><select id="bGestion"></select></div>
             <div class="campo"><label for="bLocalidad">Localidad</label><select id="bLocalidad"></select></div>
@@ -70,7 +80,7 @@
               <select id="bSolo"><option value="mov">Con movimientos</option><option value="todas">Todas</option><option value="sin">Sin movimientos</option></select></div>
             <div class="campo"><label for="bOrden">Ordenar por</label>
               <select id="bOrden"><option value="ultimo|-1">Último movimiento: más nuevo</option><option value="ultimo|1">Último movimiento: más viejo</option>
-                <option value="total|-1">Más registros</option><option value="total|1">Menos registros</option><option value="id|1">Nombre (A–Z)</option></select></div>
+                <option value="total|-1">Más registros</option><option value="total|1">Menos registros</option><option value="id|1">Nombre (A–Z)</option><option class="solo-cosa" value="cUlt|-1">Última vez que lo tuvo</option><option class="solo-cosa" value="cN|-1">Más veces</option></select></div>
           </div>
           <details class="mas-filtros" id="bMas">
             <summary><span class="txt-mas">➕ Más filtros</span><span class="txt-menos">➖ Menos filtros</span> <span class="cuenta" id="bMasCuenta"></span></summary>

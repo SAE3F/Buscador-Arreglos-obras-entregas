@@ -9,15 +9,23 @@ No escribe ni borra nada. Hay que publicarlo con una cuenta de Google que **pued
    - La primera vez Google pide permiso: *Revisar permisos* → elegí tu cuenta → *Configuración avanzada* →
      *Ir a SAE Entregas (no seguro)* → *Permitir*. (Dice "no seguro" porque es un script propio, no de una empresa verificada.)
    - Abajo, en **Registro de ejecución**, tiene que aparecer algo como
-     `Versión 1.2.0 · 4318 registros · 300 instituciones · 120 avisos`.
+     `Versión 1.3.0 · 4318 registros · 300 instituciones · 120 avisos`.
 4. **Implementar → Nueva implementación** → engranaje ⚙️ → **Aplicación web**.
-   - Descripción: `v1.2.0`
+   - Descripción: `v1.3.0`
    - Ejecutar como: **Yo**
    - Quién tiene acceso: **Cualquier persona**
    - **Implementar** y copiá la **URL de la aplicación web** (termina en `/exec`).
 5. Pegá esa URL en `js/config.js` → `SCRIPT_URL: '…/exec'`.
 
-Para probar que anda: abrí la URL en el navegador. Tiene que mostrar texto que empieza con `{"ok":true,"version":"1.2.0"…`.
+Para probar que anda: abrí la URL en el navegador. Tiene que mostrar texto que empieza con `{"ok":true,"version":"1.3.0"…`.
+
+## Actualización automática cada hora (desde 1.3.0 · hacerlo una vez)
+Así la página abre siempre rápido y los datos tienen como mucho 1 hora, aunque nadie toque 🔄 Actualizar.
+1. En el editor, en el selector de funciones elegí **`activarActualizacionAutomatica`** → **▶ Ejecutar**.
+2. Google pide un permiso nuevo (para crear el activador): aceptalo igual que la primera vez.
+3. En **Registro de ejecución** tiene que decir `Listo: los datos se van a rehacer solos cada hora.`
+4. Para verlo: menú izquierdo ⏰ **Activadores** → aparece `actualizarAutomatico` · *Basado en el tiempo* · *Cada hora*.
+Para apagarla: ejecutar **`desactivarActualizacionAutomatica`** (vuelve a la copia de 10 minutos).
 
 ## Cuando cambie el script
 Pegá el código nuevo, guardá y andá a **Implementar → Administrar implementaciones → ✏️ → Versión: Nueva versión → Implementar**.

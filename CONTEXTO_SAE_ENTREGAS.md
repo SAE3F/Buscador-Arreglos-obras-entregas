@@ -82,7 +82,9 @@ js/graficos.js        G.columnas (apiladas), G.barrasH, G.secuencial, tooltips
 js/app.js             toda la interfaz (estado S, vistas, filtros, ficha, calidad, eventos)
 apps-script/Codigo.gs   script de solo lectura (VERSION_SCRIPT)
 apps-script/PUBLICAR.md pasos para publicarlo
-vercel.json, AGENTS.md, assets/ (del kit), README.md
+sw.js                 (0.7.0) service worker: red primero (espera 4 s) y copia guardada sin internet; no toca el Apps Script ni los .json
+manifest.webmanifest  (0.7.0) app instalable ("Ficha Escuelas", azul #163C68); íconos assets/icono-192/512/maskable-512/apple-180.png
+vercel.json, AGENTS.md, assets/ (del kit), README.md   (vercel.json: sw.js sin caché; manifest con su Content-Type)
 ```
 
 ### Contrato de datos (lo que devuelve el script)
@@ -100,10 +102,10 @@ vercel.json, AGENTS.md, assets/ (del kit), README.md
 ## 5. Estado actual (24/11/2026)
 
 - **Propósito:** buscador resumido de todo lo hecho en cada escuela, para ver, imprimir o descargar antes o durante una visita.
-- **Página:** versión **0.6.2** entregada el 25/11/2026 (zip con archivos cambiados sobre la 0.6.1; la 0.6.0 fue la primera etapa de celulares). Título: **Ficha Escuelas**.
-  Falta confirmar que se subió y que se publicó el Apps Script 1.2.0.
-- **Apps Script:** versión **1.2.0** entregada (agrega reclamos). Hay que publicarla como Nueva versión. Antes estaba la 1.1.0 publicada como aplicación web ("Ejecutar como: Yo", "Cualquier persona"). La URL está en el `js/config.js` de la persona usuaria.
-- Historial: 0.1.0 (primera versión) → 0.1.1 (tablas de ancho fijo, una línea) → 0.2.0 (script 1.1.0: ir a la celda, calidad por problema, ranking Menos/Sin registros, "Sin tipo" al final, encabezados verticales) → 0.3.0 (copiar link con respaldo, aviso clicable, version.js, 12 filtros nuevos, tabla institución × categoría con columnas fijas, info de proveedores) → 0.4.0 (equipo: "Ficha Escuelas", escuelas-extra.js) → 0.5.0 (script 1.2.0: reclamos en la ficha, cómo llegar y ver en el mapa, ficha para visita con opciones e impresión numerada, arreglos agrupados desplegables, filtros nuevos en Vista general / Registros / Calidad con etiquetas ✕ y link con filtros, localidades en mayúsculas, CUE sin ".0") → 0.5.1 (arreglos agrupados solo de FACTURACION ITEMS) → 0.5.2 (grupos en verde; Ficha para visita: botón **PDF a color** que descarga directo (js/pdf.js, sin librerías) y botón **Imprimir en blanco y negro**; sin "Cómo llegar" en impresión/PDF; reclamos pedidos de antemano para que sea rápido) → 0.5.3 (arreglos agrupados por día; en Registros con subgrupo por escuela) → 0.5.4 (FACTURACION UNIDADES agrupado en violeta; botones Excel/Imprimir/PDF en azul oscuro; día abierto resaltado con otro color) → 0.5.5 (Proveedor tipeable con rubro; día de una sola escuela sin subgrupo; Más/Menos filtros) → 0.6.0 (celulares: versión concisa, ver sección de celulares) → 0.6.1 (modo claro con colores más marcados) → 0.6.2 (modo claro: escuela en amarillo y trabajos en gris dentro del día).
+- **Página:** versión **0.7.0** entregada el 25/11/2026 (zip con archivos cambiados sobre la 0.6.2). Título: **Ficha Escuelas**.
+  Necesita el **Apps Script 1.3.0** publicado (Nueva versión) y, una vez, ejecutar `activarActualizacionAutomatica` en el editor.
+- **Apps Script:** versión **1.3.0** entregada el 25/11/2026 (actualización automática cada hora: `activarActualizacionAutomatica` / `desactivarActualizacionAutomatica` / `actualizarAutomatico`; con eso la copia dura 6 h en vez de 10 min; los datos traen `auto:true`). La 1.2.0 agregó reclamos. Hay que publicarla como Nueva versión. Antes estaba la 1.1.0 publicada como aplicación web ("Ejecutar como: Yo", "Cualquier persona"). La URL está en el `js/config.js` de la persona usuaria.
+- Historial: 0.1.0 (primera versión) → 0.1.1 (tablas de ancho fijo, una línea) → 0.2.0 (script 1.1.0: ir a la celda, calidad por problema, ranking Menos/Sin registros, "Sin tipo" al final, encabezados verticales) → 0.3.0 (copiar link con respaldo, aviso clicable, version.js, 12 filtros nuevos, tabla institución × categoría con columnas fijas, info de proveedores) → 0.4.0 (equipo: "Ficha Escuelas", escuelas-extra.js) → 0.5.0 (script 1.2.0: reclamos en la ficha, cómo llegar y ver en el mapa, ficha para visita con opciones e impresión numerada, arreglos agrupados desplegables, filtros nuevos en Vista general / Registros / Calidad con etiquetas ✕ y link con filtros, localidades en mayúsculas, CUE sin ".0") → 0.5.1 (arreglos agrupados solo de FACTURACION ITEMS) → 0.5.2 (grupos en verde; Ficha para visita: botón **PDF a color** que descarga directo (js/pdf.js, sin librerías) y botón **Imprimir en blanco y negro**; sin "Cómo llegar" en impresión/PDF; reclamos pedidos de antemano para que sea rápido) → 0.5.3 (arreglos agrupados por día; en Registros con subgrupo por escuela) → 0.5.4 (FACTURACION UNIDADES agrupado en violeta; botones Excel/Imprimir/PDF en azul oscuro; día abierto resaltado con otro color) → 0.5.5 (Proveedor tipeable con rubro; día de una sola escuela sin subgrupo; Más/Menos filtros) → 0.6.0 (celulares: versión concisa, ver sección de celulares) → 0.6.1 (modo claro con colores más marcados) → 0.6.2 (modo claro: escuela en amarillo y trabajos en gris dentro del día) → 0.7.0 (script 1.3.0: sin internet + instalable, reclamo ↔ arreglo, buscar por cosa, actualización automática cada hora, "Actualizado hace…").
 
 ## 6. Pendientes y temas abiertos
 - **Para revisar con el equipo:** (a) `js/escuelas-extra.js` tiene **nombres de directoras/es en el repo público** (el kit pide no
@@ -139,6 +141,17 @@ vercel.json, AGENTS.md, assets/ (del kit), README.md
 - **Modo claro, colores marcados (0.6.1):** ITEMS `#c8ecd9` franja `#139166`; UNIDADES `#ddd0f7` franja `#6a45d1`; día abierto `#fbd3a0` franja `#F69321`;
   franjas de 5px; resumen gris más oscuro. Desde **0.6.2**, dentro del día abierto: **escuela (subgrupo) amarillo** `#fdeca6` franja `#c99a00`;
   **trabajos gris claro** `#eceff3` franja `#64748b`. Bloques "v0.6.1" y "v0.6.2" al final de app.css. El modo oscuro no cambió (azul grisáceo).
+- **0.7.0 · Sin internet e instalable:** `sw.js` guarda los archivos; los datos ya se guardaban en localStorage (`CLAVE_COPIA`); los reclamos
+  de cada escuela vista se guardan en `sae-rec-<ID>`. Sin señal: punto gris "Sin internet · datos hace…" y aviso; al volver la señal se actualiza solo.
+  Botón **📲 Instalar** en el encabezado (aparece si el navegador lo permite; en iPhone abre los pasos de Safari → Agregar a inicio).
+- **0.7.0 · Reclamo ↔ arreglo:** en cada reclamo, "🔗 Posible arreglo/entrega relacionada" = registros de esa escuela del mismo rubro entre la fecha
+  del reclamo y 60 días después (o la fecha de resolución si es más tarde); máx. 2, agrupados por día. El rubro sale por palabras clave
+  (`RUBROS_RECLAMO` en app.js: Gas, Electricidad, Plomería, Refrigeración, Canaletas, Atmosférico, Utensilios, Equipamiento). Es orientativo ("Posible").
+- **0.7.0 · Buscar por cosa** (Buscador, con "?"): busca en categoría, detalle y servicio; la lista muestra Veces / Unidades / Última vez
+  (orden "Última vez que lo tuvo" o "Más veces") y respeta los filtros. Al abrir una escuela, el detalle viene filtrado con esa palabra y en la
+  pestaña donde más aparece. En celular la lista de escuelas no muestra Nivel ni Localidad.
+- **0.7.0 · Datos al día:** "Actualizado hace X" (min / h / fecha). Verde hasta 2 h, naranja si es más viejo (conviene 🔄), gris sin internet.
+  En celular se ve la versión corta ("3 h") y el botón Actualizar queda solo con 🔄.
 - "Cantidad mínima" (Registros) tiene un **"?"** con la explicación (mouse, teclado o toque).
 - Un arreglo de un solo trabajo queda como fila suelta (no hay nada que agrupar); en Registros, dentro del día, una escuela con un solo trabajo aparece directo.
 
@@ -188,3 +201,4 @@ vercel.json, AGENTS.md, assets/ (del kit), README.md
 - **25/11/2026:** **0.6.1**: colores más marcados en modo claro. Script sigue 1.2.0.
 - **25/11/2026:** pendiente: escuela (subgrupo) y trabajos con colores distintos entre sí en modo claro.
 - **25/11/2026:** **0.6.2**: modo claro, dentro del día la escuela va en amarillo y los trabajos en gris. Script sigue 1.2.0.
+- **25/11/2026:** **0.7.0** + **Apps Script 1.3.0**: sin internet e instalable, reclamo ↔ arreglo, buscar por cosa, actualización automática cada hora, "Actualizado hace…". De la lista de propuestas se eligieron 4, 5, 7, 9 y 10; las otras (escuelas cerca mío, alertas en la ficha, marca de reclamos en la lista, qué nunca recibió, comparar escuelas, seguridad del repo, montos, Portal) quedan como ideas, no anotadas como pendientes.

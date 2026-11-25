@@ -65,7 +65,7 @@
     regs.sort(function (a, b) { return a.orden < b.orden ? 1 : a.orden > b.orden ? -1 : 0; });
     Datos.regs = regs; Datos.inst = inst; Datos.avisos = j.avisos || []; Datos.hojas = j.hojas || {};
     Datos.recPrueba = j.reclamosPrueba || null; Datos.recCache = new Map();
-    Datos.meta = { version: j.version, generado: j.generado, montos: !!j.montos, resumen: j.resumen };
+    Datos.meta = { version: j.version, generado: j.generado, montos: !!j.montos, resumen: j.resumen, auto: !!j.auto };
     Datos.listo = true;
     Datos.oyentes.forEach(function (f) { try { f(); } catch (e) { console.error(e); } });
   }
@@ -73,17 +73,28 @@
   function estado(clase, texto, titulo) {
     var e = U.$('#estadoDatos'); e.className = 'estado-datos ' + clase;
     U.$('.txt', e).textContent = texto; e.title = titulo || texto;
+    var g = Datos.meta && Datos.meta.generado, m = g ? Math.round((Date.now() - new Date(g)) / 60000) : null;   // versión corta para el celular
+    e.dataset.corto = clase === 'cargando' ? '…' : clase === 'error' ? '!' : m == null ? '' : m < 1 ? 'recién' : m < 60 ? m + ' min' : m < 1440 ? Math.round(m / 60) + ' h' : new Date(g).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' });
   }
   function cuando(iso) {
     if (!iso) return '';
     var d = new Date(iso), min = Math.round((Date.now() - d) / 60000);
     if (min < 1) return 'recién';
     if (min < 60) return 'hace ' + min + ' min';
-    return d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' }) + ' ' + d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+    if (min < 24 * 60) return 'hace ' + Math.round(min / 60) + ' h';
+    return 'del ' + d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' }) + ' ' + d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
   }
+  Datos.cuando = cuando;
+  Datos.sinInternet = false;
+  /** "Actualizado hace 3 h": verde hasta 2 h, naranja si son más viejos (conviene 🔄 Actualizar), gris sin internet */
   function mostrarEstado() {
     if (!Datos.meta) return;
-    estado('ok', 'Datos ' + cuando(Datos.meta.generado), 'Datos leídos de las planillas: ' + new Date(Datos.meta.generado).toLocaleString('es-AR') + ' · script v' + Datos.meta.version);
+    var g = Datos.meta.generado, min = g ? (Date.now() - new Date(g)) / 60000 : 1e9;
+    var largo = 'Datos leídos de las planillas: ' + (g ? new Date(g).toLocaleString('es-AR') : '—') + ' · script v' + Datos.meta.version +
+      (Datos.meta.auto ? ' · se actualizan solos cada hora' : '');
+    if (Datos.sinInternet) { estado('offline', 'Sin internet · datos ' + cuando(g), 'Sin conexión: estás viendo la copia guardada en este dispositivo. ' + largo); return; }
+    if (min > 120) estado('viejo', 'Actualizado ' + cuando(g), largo + ' · Tocá 🔄 Actualizar para traer lo último');
+    else estado('ok', 'Actualizado ' + cuando(g), largo);
   }
 
   function avisoGlobal(html, clase) {
@@ -126,6 +137,7 @@
         clearTimeout(timer);
         if (!j || !j.ok) throw new Error((j && j.error) || 'Respuesta inválida del script');
         if (!esPrueba) guardarCopia(j);
+        Datos.sinInternet = false;
         preparar(j); mostrarEstado(); avisoGlobal('');
         var cmp = compararVersion(j.version, C.VERSION_SCRIPT_ESPERADA);
         if (cmp < 0) {
@@ -140,7 +152,10 @@
       .catch(function (err) {
         clearTimeout(timer);
         console.error(err);
-        if (Datos.listo) {
+        if (Datos.listo && navigator.onLine === false) {
+          Datos.sinInternet = true; mostrarEstado();
+          avisoGlobal('📴 <b>Sin internet.</b> Estás viendo la copia guardada en este dispositivo (datos ' + U.esc(cuando(Datos.meta.generado)) + '). Cuando vuelva la señal, tocá 🔄 Actualizar.', 'naranja');
+        } else if (Datos.listo) {
           estado('error', 'Sin actualizar', 'No se pudieron leer las planillas: ' + err.message);
           avisoGlobal('⚠️ No se pudieron leer las planillas ahora (' + U.esc(err.message) + '). Estás viendo la última copia guardada. Probá con 🔄 Actualizar en un rato.', 'naranja');
         } else {
@@ -168,9 +183,16 @@
     if (Datos.recPrueba) return Promise.resolve(guardar(Datos.recPrueba[id]));
     if (!C.SCRIPT_URL) return Promise.reject(new Error('Falta la URL del script'));
     var url = C.SCRIPT_URL + (C.SCRIPT_URL.indexOf('?') < 0 ? '?' : '&') + 'accion=reclamos&inst=' + encodeURIComponent(id) + '&t=' + Date.now();
+    var clave = 'sae-rec-' + id;          // copia por escuela para poder verlos sin internet
     return fetch(url, { cache: 'no-store' }).then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }).then(function (j) {
-      if (!j || !j.ok) throw new Error((j && j.error) || 'El script no devolvió reclamos (¿está en la versión 1.2.0?)');
+      if (!j || !j.ok) throw new Error((j && j.error) || 'El script no devolvió reclamos (¿está en la versión 1.2.0 o más nueva?)');
+      try { localStorage.setItem(clave, JSON.stringify({ t: Date.now(), r: j.reclamos })); } catch (e) {}
       return guardar(j.reclamos);
+    }).catch(function (err) {
+      var c = null; try { c = JSON.parse(localStorage.getItem(clave) || 'null'); } catch (e) {}
+      if (!c) throw err;
+      var r = guardar(c.r); r.copia = c.t; Datos.recCache.delete(id);   // no se fija: la próxima vez vuelve a intentar
+      return r;
     });
   };
   /** Pide los reclamos una vez apenas carga la página: el script arma su copia y después cada ficha abre al instante */
@@ -183,5 +205,8 @@
   };
     Datos.alCambiar = function (f) { Datos.oyentes.push(f); };
   setInterval(mostrarEstado, 60000);
+  // Volvió la señal: se traen los datos nuevos solos
+  window.addEventListener('online', function () { if (Datos.sinInternet) Datos.cargar(false); });
+  window.addEventListener('offline', function () { if (Datos.listo) { Datos.sinInternet = true; mostrarEstado(); } });
   window.Datos = Datos;
 })();
