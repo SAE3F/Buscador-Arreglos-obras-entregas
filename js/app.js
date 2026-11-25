@@ -754,32 +754,36 @@
   }
 
   /** Tabla de registros (ficha y vista Registros) */
-  // ── Arreglos agrupados (solo FACTURACION ITEMS): misma institución + rubro + proveedor, con fechas del mismo día o días seguidos (±1)
+  // ── Arreglos agrupados (solo FACTURACION ITEMS), cada día por separado:
+  //    · en la ficha (una escuela): día + rubro + proveedor → trabajos
+  //    · en Registros (todas): día + rubro + proveedor → escuela → trabajos   (porEscuela = true)
   var ABIERTOS = new Set();          // grupos desplegados (se mantienen al refiltrar)
   function diasEntre(a, b) { return Math.round((Date.parse(b) - Date.parse(a)) / 86400000); }
-  function agruparArreglos(rs) {
-    var aparte = [], porClave = new Map();
+  function hacerGrupo(items, key, extra) {
+    var p = items[0];
+    var g = { grupo: true, key: key, t: 'A', inst: p.inst, I: p.I, cat: p.cat, prov: p.prov, fuente: p.fuente, fecha: p.fecha, desde: p.fecha, anio: p.anio, orden: p.fecha,
+      cant: items.reduce(function (s, r) { return s + r.cant; }, 0), det: items.length + (items.length === 1 ? ' trabajo' : ' trabajos'), items: items, ref: p.ref, monto: null, fact: '' };
+    return Object.assign(g, extra || {});
+  }
+  function agruparArreglos(rs, porEscuela) {
+    var aparte = [], porDia = new Map();
     rs.forEach(function (r) {
       if (r.t !== 'A' || !r.fecha || r.fuente !== 'FACTURACION ITEMS') { aparte.push(r); return; }
-      var k = r.inst + '|' + r.cat + '|' + r.prov, l = porClave.get(k); if (!l) porClave.set(k, l = []); l.push(r);
+      var k = r.fecha + '|' + r.cat + '|' + r.prov + (porEscuela ? '' : '|' + r.inst);
+      var l = porDia.get(k); if (!l) porDia.set(k, l = []); l.push(r);
     });
     var out = aparte.slice();
-    porClave.forEach(function (l, k) {
-      l.sort(function (a, b) { return a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : 0; });
-      var actual = null;
-      l.forEach(function (r) {
-        if (actual && diasEntre(actual.hasta, r.fecha) <= 1) { actual.items.push(r); actual.hasta = r.fecha; }
-        else { actual = { items: [r], desde: r.fecha, hasta: r.fecha }; out.push(actual); }
+    porDia.forEach(function (l, k) {
+      if (l.length === 1) { out.push(l[0]); return; }
+      if (!porEscuela) { out.push(hacerGrupo(l, k)); return; }
+      var porInst = new Map();
+      l.forEach(function (r) { var x = porInst.get(r.inst); if (!x) porInst.set(r.inst, x = []); x.push(r); });
+      var subs = Array.from(porInst.entries()).sort(function (a, b) { return b[1].length - a[1].length || ordenEs(a[0], b[0]); }).map(function (e) {
+        return e[1].length === 1 ? e[1][0] : hacerGrupo(e[1], k + '|' + e[0], { sub: true });
       });
+      out.push(hacerGrupo(l, k, { subs: subs, nEsc: porInst.size, inst: porInst.size === 1 ? l[0].inst : '' }));
     });
-    return out.map(function (x) {
-      if (!x.items) return x;
-      if (x.items.length === 1) return x.items[0];
-      var p = x.items[0], cant = x.items.reduce(function (s, r) { return s + r.cant; }, 0);
-      return { grupo: true, key: p.inst + '|' + p.cat + '|' + p.prov + '|' + x.desde, t: 'A', inst: p.inst, I: p.I, cat: p.cat, prov: p.prov, fuente: p.fuente,
-        fecha: x.hasta, desde: x.desde, anio: p.anio, orden: x.hasta, cant: cant, det: x.items.length + ' trabajos',
-        items: x.items.slice().sort(function (a, b) { return a.fecha < b.fecha ? 1 : -1; }), ref: p.ref, monto: null, fact: '' };
-    });
+    return out;
   }
   function fechaGrupo(g) {            // 05–06/10/25 · 30/09–01/10/25 · 31/12/25–01/01/26
     if (g.desde === g.fecha) return U.fecha(g.fecha);
@@ -806,21 +810,27 @@
       var detTitulo = r.det + (r.serv && r.t !== 'O' ? ' — ' + r.serv : '');
       return '<tr class="' + (clase || '') + '"' + (extra || '') + '>' + (conInst ? celda('', T[r.t].uno, etiquetaTipo(r.t)) : '') + celda('fecha', String(fechaReg(r))) +
         (conInst ? celda('inst', r.inst, linkInst(r.inst)) : '') +
-        celda('', r.cat, U.icono(r.cat) + '&nbsp;' + esc(r.cat)) + celda('', detTitulo, (clase === 'fila-hijo' ? '<span class="sangria">↳</span> ' : '') + esc(r.det)) +
+        celda('', r.cat, U.icono(r.cat) + '&nbsp;' + esc(r.cat)) + celda('', detTitulo, (clase && clase.indexOf('fila-hijo') === 0 ? '<span class="sangria">↳</span> ' : '') + esc(r.det)) +
         celda('num', n(r.cant)) + celda('chico', r.prov) +
         (m ? celda('num', r.monto == null ? '' : '$ ' + n(r.monto)) + celda('chico', r.fact || '') : '') +
         celda('fuente', r.fuente) + '<td class="ir">' + botonIr(r.ref) + '</td></tr>';
     }
-    function grupo(g) {
-      var ab = ABIERTOS.has(g.key), k = esc(g.key);
-      var resumen = g.items.slice(0, 3).map(function (r) { return r.det.replace(/:\s*$/, ''); }).join(' · ') + (g.items.length > 3 ? ' …' : '');
-      return '<tr class="fila-grupo' + (ab ? ' abierto' : '') + '" data-grupo="' + k + '" tabindex="0" aria-expanded="' + ab + '" title="Tocá para ' + (ab ? 'cerrar' : 'ver') + ' los ' + g.items.length + ' trabajos">' +
+    function abierto(anc) { return anc.every(function (k) { return ABIERTOS.has(k); }); }
+    function attrs(anc) { return anc.length ? ' data-anc="' + esc(anc.join('§')) + '"' + (abierto(anc) ? '' : ' hidden') : ''; }
+    function resumenDe(items) { return items.slice(0, 3).map(function (r) { return r.det.replace(/:\s*$/, ''); }).join(' · ') + (items.length > 3 ? ' …' : ''); }
+    function grupo(g, anc) {
+      anc = anc || [];
+      var ab = ABIERTOS.has(g.key), k = esc(g.key), hijos = g.subs || g.items;
+      var titulo = g.subs ? (g.nEsc > 1 ? n(g.nEsc) + ' escuelas · ' : '') + g.det : g.det;
+      var instHtml = g.subs ? (g.nEsc > 1 ? '<span class="muted">' + n(g.nEsc) + ' escuelas</span>' : linkInst(g.inst)) : linkInst(g.inst);
+      var fila0 = '<tr class="' + (g.sub ? 'fila-sub' : 'fila-grupo') + (ab ? ' abierto' : '') + '" data-grupo="' + k + '"' + attrs(anc) + ' tabindex="0" aria-expanded="' + ab + '" title="Tocá para ' + (ab ? 'cerrar' : 'abrir') + '">' +
         (conInst ? celda('', 'Arreglo', etiquetaTipo('A')) : '') + celda('fecha', fechaGrupo(g)) +
-        (conInst ? celda('inst', g.inst, linkInst(g.inst)) : '') +
+        (conInst ? celda('inst', g.inst || (g.nEsc + ' escuelas'), instHtml) : '') +
         celda('', g.cat, U.icono(g.cat) + '&nbsp;' + esc(g.cat)) +
-        celda('', g.det + ': ' + resumen, '<span class="flecha-grupo">▸</span> <b>' + esc(g.det) + '</b> <span class="muted">· ' + esc(resumen) + '</span>') +
-        celda('num', n(g.cant)) + celda('chico', g.prov) + (m ? '<td></td><td></td>' : '') + celda('fuente', g.fuente) + '<td class="ir"></td></tr>' +
-        g.items.map(function (r) { return fila(r, 'fila-hijo', ' data-padre="' + k + '"' + (ab ? '' : ' hidden')); }).join('');
+        celda('', titulo + ': ' + resumenDe(g.items), (g.sub ? '<span class="sangria">↳</span> ' : '') + '<span class="flecha-grupo">▸</span> <b>' + esc(titulo) + '</b> <span class="muted">· ' + esc(resumenDe(g.items)) + '</span>') +
+        celda('num', n(g.cant)) + celda('chico', g.prov) + (m ? '<td></td><td></td>' : '') + celda('fuente', g.fuente) + '<td class="ir"></td></tr>';
+      var anc2 = anc.concat([g.key]);
+      return fila0 + hijos.map(function (h) { return h.grupo ? grupo(h, anc2) : fila(h, g.sub ? 'fila-hijo nivel2' : g.subs ? 'fila-hijo nivel1' : 'fila-hijo', attrs(anc2)); }).join('');
     }
     return '<table class="tabla-fija" style="min-width:' + minimo + 'px"><colgroup>' + cols.map(function (c) { return '<col' + (c[3] ? ' style="width:' + c[3] + 'px"' : '') + '>'; }).join('') +
       '</colgroup><thead><tr>' + cols.map(function (c) {
@@ -832,17 +842,21 @@
     var k = tr.dataset.grupo, ab = !ABIERTOS.has(k);
     if (ab) ABIERTOS.add(k); else ABIERTOS.delete(k);
     tr.classList.toggle('abierto', ab); tr.setAttribute('aria-expanded', String(ab));
-    $$('tr[data-padre]', tr.parentNode).forEach(function (h) { if (h.dataset.padre === k) h.hidden = !ab; });
+    $$('tr[data-anc]', tr.parentNode).forEach(function (h) { h.hidden = !h.dataset.anc.split('§').every(function (x) { return ABIERTOS.has(x); }); });
   }
   /** Excel: los grupos salen como una fila de resumen y sus trabajos abajo */
   function filasExcel(lista) {
     var out = [];
-    lista.forEach(function (r) {
-      if (!r.grupo) { out.push(paraExcel(r)); return; }
-      var f = paraExcel(r.items[0]); f[1] = U.fechaLarga(r.desde) + (r.desde !== r.fecha ? ' a ' + U.fechaLarga(r.fecha) : ''); f[8] = '▸ ' + r.det; f[9] = r.cant; f[11] = ''; f[14] = '';
+    function agregar(r, nivel) {
+      var sang = new Array(nivel + 1).join('    ');
+      if (!r.grupo) { var f0 = paraExcel(r); if (nivel) f0[8] = sang + '↳ ' + f0[8]; out.push(f0); return; }
+      var f = paraExcel(r.items[0]); f[1] = U.fechaLarga(r.fecha); f[9] = r.cant; f[11] = ''; f[14] = '';
+      f[8] = sang + '▸ ' + (r.subs && r.nEsc > 1 ? r.nEsc + ' escuelas · ' : '') + r.det;
+      if (r.subs && r.nEsc > 1) { f[3] = ''; f[4] = ''; f[5] = ''; f[6] = ''; }
       out.push(f);
-      r.items.forEach(function (x) { var g = paraExcel(x); g[8] = '    ↳ ' + g[8]; out.push(g); });
-    });
+      (r.subs || r.items).forEach(function (h) { agregar(h, nivel + 1); });
+    }
+    lista.forEach(function (r) { agregar(r, 0); });
     return out;
   }
 
@@ -1183,7 +1197,7 @@
     pintarChips($('#rChips'), chipsRegistros(), function () { S.r.pag = 0; pintarRegistros(); });
     guardarFiltrosR();
     var sueltos = filtrarRegistros();
-    var rs = r.agrupar ? agruparArreglos(sueltos) : sueltos;
+    var rs = r.agrupar ? agruparArreglos(sueltos, true) : sueltos;
     var col = r.col, dir = r.dir;
     rs.sort(function (a, b) {
       var va = col === 'inst' ? a.inst : a[col], vb = col === 'inst' ? b.inst : b[col];
@@ -1400,10 +1414,10 @@
     };
     // Abrir / cerrar grupos de arreglos (cualquier tabla)
     document.addEventListener('click', function (e) {
-      var tr = e.target.closest('tr.fila-grupo'); if (!tr || e.target.closest('a, button')) return; alternarGrupo(tr);
+      var tr = e.target.closest('tr.fila-grupo, tr.fila-sub'); if (!tr || e.target.closest('a, button')) return; alternarGrupo(tr);
     });
     document.addEventListener('keydown', function (e) {
-      if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('tr.fila-grupo')) { e.preventDefault(); alternarGrupo(e.target); }
+      if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('tr.fila-grupo, tr.fila-sub')) { e.preventDefault(); alternarGrupo(e.target); }
     });
 
     // Encabezado

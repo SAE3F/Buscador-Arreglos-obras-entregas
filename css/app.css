@@ -384,3 +384,13 @@ html.dark { --grupo-bg: #12352a; --grupo-bg-hover: #174233; --grupo-hijo: #0f261
   body.bn .impr-cab { border-bottom-color: #000; }
   body.bn .impr th { background: #e5e5e5; }
 }
+/* Subgrupo por escuela dentro del día (Registros) */
+.tabla-fija tr.fila-sub { cursor: pointer; }
+.tabla-fija tr.fila-sub td { background: var(--grupo-sub); font-size: .88rem; }
+.tabla-fija tr.fila-sub td:first-child { box-shadow: inset 4px 0 0 var(--c-A); }
+.tabla-fija tr.fila-sub:hover td { background: var(--grupo-bg-hover); }
+tr.fila-sub.abierto .flecha-grupo { transform: rotate(90deg); }
+.tabla-fija tr.fila-hijo.nivel1 td { font-size: .86rem; }
+:root { --grupo-sub: #eef9f3; }
+html.dark { --grupo-sub: #133026; }
+.tabla-fija tr.fila-hijo.nivel2 .sangria { margin-left: 2rem; }
