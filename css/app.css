@@ -509,3 +509,27 @@ html.dark .ayuda { color: #7fb2ff; }
   font-size: .78rem; font-weight: 500; line-height: 1.35; box-shadow: 0 8px 22px rgba(0,0,0,.2); white-space: normal; }
 .ayuda:focus { outline: 2px solid var(--primary); outline-offset: 1px; }
 @media (max-width: 640px) { .campo label { position: relative; } .ayuda { position: static; } .ayuda:hover::after, .ayuda:focus::after { left: 0; top: calc(100% + 4px); transform: none; width: 260px; max-width: calc(100vw - 3rem); } }
+
+/* ===== v0.6.1 · Modo claro: colores más marcados (el oscuro no cambia) ===== */
+html:not(.dark) {
+  --grupo-bg: #c8ecd9; --grupo-bg-hover: #b5e4cb; --grupo-hijo: #e9f7f0; --grupo-sub: #dcf2e7;
+  --un-bg: #ddd0f7; --un-hover: #cfbdf2; --un-sub: #e9e1fa; --un-hijo: #f3effd; --un-borde: #6a45d1;
+  --abierto-dia: #fbd3a0; --abierto-dia-un: #fbd3a0;
+  --dentro-sub: #d3e2f6; --dentro-hijo: #e3edfa; --dentro-borde: #2a78d6;
+}
+html:not(.dark) .tabla-fija tr.fila-grupo td:first-child { box-shadow: inset 5px 0 0 #139166; }
+html:not(.dark) .tabla-fija tr.fila-grupo.un td:first-child { box-shadow: inset 5px 0 0 #6a45d1; }
+html:not(.dark) .tabla-fija tr.fila-grupo.abierto td:first-child { box-shadow: inset 5px 0 0 #F69321; }
+html:not(.dark) .tabla-fija tr.fila-grupo.un.abierto td:first-child { box-shadow: inset 5px 0 0 #F69321; }
+html:not(.dark) .tabla-fija tr.fila-sub td:first-child, html:not(.dark) .tabla-fija tr.fila-hijo td:first-child { box-shadow: inset 5px 0 0 #2a78d6; }
+html:not(.dark) .tabla-fija tr.fila-grupo td, html:not(.dark) .tabla-fija tr.fila-sub td, html:not(.dark) .tabla-fija tr.fila-hijo td { border-bottom-color: rgba(22,60,104,.16); }
+html:not(.dark) .tabla-fija tr.fila-grupo .muted, html:not(.dark) .tabla-fija tr.fila-sub .muted { color: #3f4b5c; }
+html:not(.dark) .tabla-fija tr.fila-grupo .fuente, html:not(.dark) .tabla-fija tr.fila-sub .fuente { color: #5b6676; }
+html:not(.dark) .tabla-fija tr.fila-sub:hover td, html:not(.dark) .tabla-fija tr.fila-hijo:hover td { background: #c9daf2; }
+@media (max-width: 640px) {
+  html:not(.dark) .tabla-fija tr.fila-grupo { box-shadow: inset 5px 0 0 #139166; }
+  html:not(.dark) .tabla-fija tr.fila-grupo.un { box-shadow: inset 5px 0 0 #6a45d1; }
+  html:not(.dark) .tabla-fija tr.fila-grupo.abierto { box-shadow: inset 5px 0 0 #F69321; }
+  html:not(.dark) .tabla-fija tr.fila-sub, html:not(.dark) .tabla-fija tr.fila-hijo { box-shadow: inset 5px 0 0 #2a78d6; }
+  html:not(.dark) .tabla-fija tr { border-bottom-color: rgba(22,60,104,.16); }
+}
