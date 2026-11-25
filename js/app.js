@@ -48,6 +48,107 @@
   // ───────────────────────── helpers
   function valores(arr, fn) { var s = new Set(); arr.forEach(function (x) { var v = fn(x); if (v != null && v !== '') s.add(v); }); return Array.from(s); }
   function ordenEs(a, b) { return String(a).localeCompare(String(b), 'es', { numeric: true }); }
+
+  /* ---- v0.5.5: proveedor con rubro + campo tipeable ---- */
+  var RUBROS = { regs: null, mapa: null };
+  function rubrosDe(prov) {          // "Gas, Plomería" — de más a menos registros, de todos sus registros
+    if (RUBROS.regs !== Datos.regs) {
+      var m = new Map();
+      Datos.regs.forEach(function (r) { if (!r.prov) return; var c = m.get(r.prov); if (!c) m.set(r.prov, c = new Map()); c.set(r.cat, (c.get(r.cat) || 0) + 1); });
+      RUBROS = { regs: Datos.regs, mapa: m };
+    }
+    var c = RUBROS.mapa.get(prov); if (!c) return '';
+    var l = Array.from(c.entries()).filter(function (e) { return e[0] && !/^sin /i.test(e[0]); })
+      .sort(function (a, b) { return b[1] - a[1] || ordenEs(a[0], b[0]); }).map(function (e) { return e[0]; });
+    return l.length > 3 ? l.slice(0, 3).join(', ') + ' +' + (l.length - 3) : l.join(', ');
+  }
+  function opcionesProv(sel, lista, actual) {
+    U.opciones(sel, lista.sort(U.ordenTexto).map(function (p) { var r = rubrosDe(p); return [p, r ? p + ' — ' + r : p]; }), 'Todos', actual);
+    combo(sel);
+  }
+  /** Convierte un <select> en un campo que se puede tipear y que igual despliega la lista. El select (oculto) sigue siendo el valor real. */
+  function combo(sel) {
+    if (!sel || sel.dataset.combo) return;
+    sel.dataset.combo = '1';
+    var caja = document.createElement('div'); caja.className = 'combo';
+    sel.parentNode.insertBefore(caja, sel); caja.appendChild(sel);
+    sel.classList.add('combo-oculto'); sel.tabIndex = -1; sel.setAttribute('aria-hidden', 'true');
+    var inp = document.createElement('input'); inp.type = 'text'; inp.className = 'combo-input'; inp.id = sel.id + 'Texto';
+    inp.autocomplete = 'off'; inp.spellcheck = false; inp.setAttribute('role', 'combobox'); inp.setAttribute('aria-expanded', 'false'); inp.setAttribute('aria-autocomplete', 'list');
+    var lab = document.querySelector('label[for="' + sel.id + '"]'); if (lab) lab.htmlFor = inp.id;
+    var flecha = document.createElement('button'); flecha.type = 'button'; flecha.className = 'combo-flecha'; flecha.tabIndex = -1; flecha.setAttribute('aria-label', 'Ver opciones'); flecha.textContent = '▾';
+    var x = document.createElement('button'); x.type = 'button'; x.className = 'combo-x'; x.setAttribute('aria-label', 'Quitar (Todos)'); x.textContent = '✕';
+    var lista = document.createElement('ul'); lista.className = 'combo-lista'; lista.setAttribute('role', 'listbox'); lista.id = sel.id + 'Lista'; lista.hidden = true;
+    inp.setAttribute('aria-controls', lista.id);
+    caja.append(inp, x, flecha, lista);
+    var items = [], activo = -1;
+    function textoSel() { var o = sel.options[sel.selectedIndex]; return o && o.value ? o.value : ''; }   // en el campo va solo el nombre; el rubro se ve en la lista
+    function sync() {
+      if (document.activeElement !== inp) inp.value = textoSel();
+      inp.placeholder = sel.options[0] ? sel.options[0].textContent : '';
+      inp.disabled = sel.disabled; x.hidden = !sel.value || sel.disabled; caja.classList.remove('combo-error');
+    }
+    function pintar() {
+      lista.innerHTML = items.length ? items.map(function (o, k) {
+        var t = o.textContent, i = t.indexOf(' — ');
+        var html = i > 0 ? '<b>' + esc(t.slice(0, i)) + '</b><span class="combo-rubro">' + esc(t.slice(i + 3)) + '</span>' : '<b>' + esc(t) + '</b>';
+        return '<li role="option" id="' + sel.id + 'Op' + k + '" data-k="' + k + '" aria-selected="' + (o.value === sel.value) + '" class="' + (k === activo ? 'activo' : '') + '">' + html + '</li>';
+      }).join('') : '<li class="combo-nada">Ningún proveedor coincide</li>';
+      inp.setAttribute('aria-activedescendant', activo >= 0 ? sel.id + 'Op' + activo : '');
+      var a = lista.querySelector('.activo'); if (a) a.scrollIntoView({ block: 'nearest' });
+    }
+    function abrir(filtrar) {
+      if (sel.disabled) return;
+      var q = filtrar ? U.norm(inp.value) : '', partes = q ? q.split(' ') : [];
+      items = Array.from(sel.options).filter(function (o) { var t = U.norm(o.textContent); return partes.every(function (p) { return t.indexOf(p) >= 0; }); });
+      activo = filtrar && q ? (items.length ? 0 : -1) : items.findIndex(function (o) { return o.value === sel.value; });
+      pintar(); lista.hidden = false; caja.classList.add('abierto'); inp.setAttribute('aria-expanded', 'true');
+    }
+    function cerrar() { lista.hidden = true; caja.classList.remove('abierto'); inp.setAttribute('aria-expanded', 'false'); }
+    function elegir(v) {
+      cerrar();
+      if (sel.value !== v) { sel.value = v; sel.dispatchEvent(new Event('change', { bubbles: true })); }
+      inp.value = textoSel(); x.hidden = !sel.value; caja.classList.remove('combo-error');
+    }
+    function confirmar() {          // al salir del campo: vacío = Todos; si coincide uno, se elige; si no, avisa y vuelve atrás
+      var q = U.norm(inp.value);
+      if (!q) { elegir(''); return; }
+      if (q === U.norm(textoSel())) { inp.value = textoSel(); return; }
+      var exacto = Array.from(sel.options).filter(function (o) { return o.value && (U.norm(o.value) === q || U.norm(o.textContent) === q); });
+      var parecidos = Array.from(sel.options).filter(function (o) { return o.value && q.split(' ').every(function (p) { return U.norm(o.textContent).indexOf(p) >= 0; }); });
+      var o = exacto[0] || (parecidos.length === 1 ? parecidos[0] : null);
+      if (o) { elegir(o.value); return; }
+      inp.value = textoSel(); caja.classList.add('combo-error');
+      U.toast(parecidos.length ? '⚠️ Hay varios proveedores que coinciden: elegí uno de la lista' : '⚠️ Ningún proveedor coincide con eso: no se filtró');
+      setTimeout(function () { caja.classList.remove('combo-error'); }, 2500);
+    }
+    inp.addEventListener('focus', function () { inp.select(); abrir(false); });
+    inp.addEventListener('click', function () { if (lista.hidden) abrir(false); });
+    inp.addEventListener('input', function () { abrir(true); });
+    inp.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault(); if (lista.hidden) { abrir(false); return; }
+        if (!items.length) return;
+        activo = (activo + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length; pintar();
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (!lista.hidden && activo >= 0 && items[activo]) elegir(items[activo].value); else { cerrar(); confirmar(); }
+      } else if (e.key === 'Escape') {
+        if (!lista.hidden) { e.preventDefault(); e.stopPropagation(); cerrar(); inp.value = textoSel(); }
+      } else if (e.key === 'Tab') { cerrar(); }
+    });
+    inp.addEventListener('blur', function () { setTimeout(function () { if (document.activeElement === inp) return; cerrar(); confirmar(); }, 120); });
+    lista.addEventListener('mousedown', function (e) { e.preventDefault(); });
+    lista.addEventListener('click', function (e) { var li = e.target.closest('li[data-k]'); if (li) { elegir(items[+li.dataset.k].value); inp.blur(); } });
+    flecha.addEventListener('mousedown', function (e) { e.preventDefault(); });
+    flecha.addEventListener('click', function () { if (lista.hidden) { inp.focus(); abrir(false); } else cerrar(); });
+    x.addEventListener('click', function () { elegir(''); });
+    sel.addEventListener('change', sync);
+    new MutationObserver(function () { Promise.resolve().then(sync); }).observe(sel, { childList: true, attributes: true, attributeFilter: ['disabled'] });
+    document.addEventListener('mousedown', function fuera(e) { if (!caja.isConnected) { document.removeEventListener('mousedown', fuera); return; } if (!caja.contains(e.target) && !lista.hidden) cerrar(); });
+    sync();
+    sel._comboSync = sync;
+  }
   function fechaReg(r) { return r.fecha ? U.fecha(r.fecha) : (r.anio || 's/f'); }
   function medida(r) { return S.g.medida === 'uni' ? (r.cant || 0) : 1; }
   function linkInst(id, texto) { return '<a data-inst="' + esc(id) + '">' + esc(texto || id) + '</a>'; }
@@ -676,7 +777,7 @@
     U.opciones($('#fAnio'), valores(base, function (r) { return r.anio; }).sort().reverse(), 'Todos', F.anio);
     U.opciones($('#fMes'), MESES.map(function (m, k) { return [String(k + 1).padStart(2, '0'), m]; }), 'Todos', F.mes);
     U.opciones($('#fCat'), valores(base, function (r) { return r.cat; }).sort(U.ordenTexto), 'Todas', F.cat);
-    U.opciones($('#fProv'), valores(base, function (r) { return r.prov; }).sort(U.ordenTexto), 'Todos', F.prov);
+    opcionesProv($('#fProv'), valores(base, function (r) { return r.prov; }), F.prov);
     $('#fProv').disabled = !$('#fProv').options[1];
     var q = U.norm(F.q), rg = rangoPeriodo(F.periodo, F.desde, F.hasta), sinF = 0;
     var rs = base.filter(function (r) {
@@ -775,9 +876,9 @@
     var out = aparte.slice();
     porDia.forEach(function (l, k) {
       if (l.length === 1) { out.push(l[0]); return; }
-      if (!porEscuela) { out.push(hacerGrupo(l, k)); return; }
       var porInst = new Map();
       l.forEach(function (r) { var x = porInst.get(r.inst); if (!x) porInst.set(r.inst, x = []); x.push(r); });
+      if (!porEscuela || porInst.size === 1) { out.push(hacerGrupo(l, k)); return; }   // una sola escuela: abre directo los trabajos
       var subs = Array.from(porInst.entries()).sort(function (a, b) { return b[1].length - a[1].length || ordenEs(a[0], b[0]); }).map(function (e) {
         return e[1].length === 1 ? e[1][0] : hacerGrupo(e[1], k + '|' + e[0], { sub: true });
       });
@@ -964,7 +1065,7 @@
     U.opciones($('#gNivel'), valores(insts, function (i) { return i.nivel; }).sort(U.ordenTexto), 'Todos', g.nivel);
     U.opciones($('#gGestion'), valores(insts, function (i) { return i.gestion; }).sort(U.ordenTexto), 'Todas', g.gestion);
     U.opciones($('#gLocalidad'), valores(insts, function (i) { return i.localidad; }).sort(U.ordenTexto), 'Todas', g.localidad);
-    U.opciones($('#gProv'), valores(base, function (r) { return r.prov; }).sort(U.ordenTexto), 'Todos', g.prov);
+    opcionesProv($('#gProv'), valores(base, function (r) { return r.prov; }), g.prov);
     $$('#gMedida button').forEach(function (b) { b.setAttribute('aria-selected', String(b.dataset.m === g.medida)); });
     U.opciones($('#gServicio'), valores(insts, function (i) { return i.servicio; }).sort(U.ordenTexto), 'Todos', g.servicio);
     U.opciones($('#gFuente'), valores(Datos.regs, function (r) { return r.fuente; }).sort(), 'Todas', g.fuente);
@@ -1181,7 +1282,7 @@
     U.opciones($('#rAnio'), valores(Datos.regs, function (x) { return x.anio; }).sort().reverse(), 'Todos', r.anio);
     U.opciones($('#rCat'), valores(base, function (x) { return x.cat; }).sort(U.ordenTexto), 'Todas', r.cat);
     U.opciones($('#rFuente'), valores(Datos.regs, function (x) { return x.fuente; }).sort(), 'Todas', r.fuente);
-    U.opciones($('#rProv'), valores(base, function (x) { return x.prov; }).sort(U.ordenTexto), 'Todos', r.prov);
+    opcionesProv($('#rProv'), valores(base, function (x) { return x.prov; }), r.prov);
     var insts = Array.from(Datos.inst.values());
     U.opciones($('#rNivel'), valores(insts, function (i) { return i.nivel; }).sort(U.ordenTexto), 'Todos', r.nivel);
     U.opciones($('#rGestion'), valores(insts, function (i) { return i.gestion; }).sort(U.ordenTexto), 'Todas', r.gestion);
@@ -1437,7 +1538,7 @@
       U.opciones($('#bGestion'), valores(insts, function (i) { return i.gestion; }).sort(U.ordenTexto), 'Todas', $('#bGestion').value);
       U.opciones($('#bLocalidad'), valores(insts, function (i) { return i.localidad; }).sort(U.ordenTexto), 'Todas', $('#bLocalidad').value);
       U.opciones($('#bTieneCat'), valores(Datos.regs, function (r) { return r.cat; }).sort(U.ordenTexto).map(function (c) { return [c, U.icono(c) + ' ' + c]; }), 'Cualquiera', $('#bTieneCat').value);
-      U.opciones($('#bProv'), valores(Datos.regs, function (r) { return r.prov; }).sort(U.ordenTexto), 'Todos', $('#bProv').value);
+      opcionesProv($('#bProv'), valores(Datos.regs, function (r) { return r.prov; }), $('#bProv').value);
       ['bNivel', 'bGestion', 'bLocalidad', 'bTieneCat', 'bProv'].forEach(function (k) { var el = $('#' + k); if (el.dataset.pendiente) { el.value = el.dataset.pendiente; if (el.value === el.dataset.pendiente) delete el.dataset.pendiente; } });
       if (['bInactiva', 'bDesde', 'bHasta', 'bTieneCat', 'bProv'].some(function (k) { return $('#' + k).value; })) $('#bMas').open = true;
       armarIndices();

@@ -100,14 +100,14 @@ vercel.json, AGENTS.md, assets/ (del kit), README.md
 ## 5. Estado actual (24/11/2026)
 
 - **Propósito:** buscador resumido de todo lo hecho en cada escuela, para ver, imprimir o descargar antes o durante una visita.
-- **Página:** versión **0.5.4** entregada el 25/11/2026 (zip con archivos cambiados sobre la 0.5.3). Título: **Ficha Escuelas**.
+- **Página:** versión **0.5.5** entregada el 25/11/2026 (zip con archivos cambiados sobre la 0.5.4). Título: **Ficha Escuelas**.
   Falta confirmar que se subió y que se publicó el Apps Script 1.2.0.
 - **Apps Script:** versión **1.2.0** entregada (agrega reclamos). Hay que publicarla como Nueva versión. Antes estaba la 1.1.0 publicada como aplicación web ("Ejecutar como: Yo", "Cualquier persona"). La URL está en el `js/config.js` de la persona usuaria.
-- Historial: 0.1.0 (primera versión) → 0.1.1 (tablas de ancho fijo, una línea) → 0.2.0 (script 1.1.0: ir a la celda, calidad por problema, ranking Menos/Sin registros, "Sin tipo" al final, encabezados verticales) → 0.3.0 (copiar link con respaldo, aviso clicable, version.js, 12 filtros nuevos, tabla institución × categoría con columnas fijas, info de proveedores) → 0.4.0 (equipo: "Ficha Escuelas", escuelas-extra.js) → 0.5.0 (script 1.2.0: reclamos en la ficha, cómo llegar y ver en el mapa, ficha para visita con opciones e impresión numerada, arreglos agrupados desplegables, filtros nuevos en Vista general / Registros / Calidad con etiquetas ✕ y link con filtros, localidades en mayúsculas, CUE sin ".0") → 0.5.1 (arreglos agrupados solo de FACTURACION ITEMS) → 0.5.2 (grupos en verde; Ficha para visita: botón **PDF a color** que descarga directo (js/pdf.js, sin librerías) y botón **Imprimir en blanco y negro**; sin "Cómo llegar" en impresión/PDF; reclamos pedidos de antemano para que sea rápido) → 0.5.3 (arreglos agrupados por día; en Registros con subgrupo por escuela) → 0.5.4 (FACTURACION UNIDADES agrupado en violeta; botones Excel/Imprimir/PDF en azul oscuro; día abierto resaltado con otro color).
+- Historial: 0.1.0 (primera versión) → 0.1.1 (tablas de ancho fijo, una línea) → 0.2.0 (script 1.1.0: ir a la celda, calidad por problema, ranking Menos/Sin registros, "Sin tipo" al final, encabezados verticales) → 0.3.0 (copiar link con respaldo, aviso clicable, version.js, 12 filtros nuevos, tabla institución × categoría con columnas fijas, info de proveedores) → 0.4.0 (equipo: "Ficha Escuelas", escuelas-extra.js) → 0.5.0 (script 1.2.0: reclamos en la ficha, cómo llegar y ver en el mapa, ficha para visita con opciones e impresión numerada, arreglos agrupados desplegables, filtros nuevos en Vista general / Registros / Calidad con etiquetas ✕ y link con filtros, localidades en mayúsculas, CUE sin ".0") → 0.5.1 (arreglos agrupados solo de FACTURACION ITEMS) → 0.5.2 (grupos en verde; Ficha para visita: botón **PDF a color** que descarga directo (js/pdf.js, sin librerías) y botón **Imprimir en blanco y negro**; sin "Cómo llegar" en impresión/PDF; reclamos pedidos de antemano para que sea rápido) → 0.5.3 (arreglos agrupados por día; en Registros con subgrupo por escuela) → 0.5.4 (FACTURACION UNIDADES agrupado en violeta; botones Excel/Imprimir/PDF en azul oscuro; día abierto resaltado con otro color) → 0.5.5 (Proveedor tipeable con rubro; día de una sola escuela sin subgrupo; Más/Menos filtros).
 
 ## 6. Pendientes y temas abiertos
 
-- **Siguiente etapa (acordada 25/11/2026): optimización para celulares**, después de revisar juntos que la 0.5.4 funcione bien.
+- **Siguiente etapa (acordada 25/11/2026): optimización para celulares**, después de revisar juntos que la 0.5.5 funcione bien.
 - **Para revisar con el equipo:** (a) `js/escuelas-extra.js` tiene **nombres de directoras/es en el repo público** (el kit pide no
   publicar datos personales); lo prolijo sería traerlos desde una planilla vía Apps Script; (b) sacar del repo `LINK_APPSCRIPT_SAE_ENTREGAS.txt`,
   el zip y el contexto viejo; (c) `js/config.js` con la URL del script queda público (sin clave, decisión del equipo).
@@ -127,6 +127,11 @@ vercel.json, AGENTS.md, assets/ (del kit), README.md
 - Ficha para visita: se elige apartados, columnas, período (todo / 12 meses / lo filtrado) y formato (resumida = últimos 10 / completa);
   hojas numeradas abajo a la izquierda ("Hoja X de Y"). **PDF siempre a color** (descarga directa) e **Imprimir siempre en blanco y negro**. Botones: Cancelar (secundario) y **⬇️ Excel / 🖨️ Imprimir / ⬇️ PDF** en azul oscuro (primario).
   **Sin "Cómo llegar"** en impresión/PDF (el botón en pantalla y el Excel lo mantienen).
+- **Proveedor** (Buscador, ficha, Vista general, Registros): campo **tipeable** (`combo()` en app.js; el `<select>` queda oculto y sigue siendo el valor real).
+  Al hacer clic se despliega la lista; cada proveedor muestra debajo su **rubro** (de todos sus registros, de más a menos, hasta 3 + "+N").
+  Tipear filtra por nombre o rubro; ↑↓ / Enter / Esc; ✕ vuelve a Todos; si no coincide, no filtra y avisa. En el campo queda solo el nombre.
+- "➕ Más filtros" cambia a "➖ Menos filtros" cuando está abierto (solo CSS).
+- Registros: si un día agrupado tiene **una sola escuela**, no hay subgrupo: abre directo los trabajos.
 - Un arreglo de un solo trabajo queda como fila suelta (no hay nada que agrupar); en Registros, dentro del día, una escuela con un solo trabajo aparece directo.
 
 ## 7. Cosas a tener en cuenta
@@ -164,3 +169,8 @@ vercel.json, AGENTS.md, assets/ (del kit), README.md
 - **25/11/2026:** pendiente: botones de la Ficha para visita sin "blanco y negro"/"a color" y todos en azul oscuro.
 - **25/11/2026:** pendiente: agrupar FACTURACION UNIDADES por día (otro color).
 - **25/11/2026:** **0.5.4**: FACTURACION UNIDADES agrupado igual que ITEMS en violeta (incluye entregas); botones de la Ficha para visita renombrados y en azul oscuro; día abierto resaltado (claro: naranja suave) y contenido en azul grisáceo. Script sigue 1.2.0.
+- **25/11/2026:** pendiente: mostrar el rubro al lado de cada proveedor en los desplegables.
+- **25/11/2026:** pendiente: poder tipear el proveedor (lista que igual se despliega para elegir).
+- **25/11/2026:** pendiente: día con una sola escuela → sin subgrupo, abre directo los trabajos.
+- **25/11/2026:** pendiente: el botón "Más filtros" pasa a "Menos filtros" cuando está abierto. Se explicó "Cantidad mínima" (filtra cada trabajo por su cantidad, no el total del grupo).
+- **25/11/2026:** **0.5.5**: Proveedor tipeable con rubro en la lista; día con una sola escuela sin subgrupo; Más/Menos filtros. Script sigue 1.2.0.
