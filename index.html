@@ -73,6 +73,10 @@
           <div class="filtros" style="margin-top:.8rem">
             <div class="campo campo-cosa"><label for="bCosa">Buscar por cosa <span class="ayuda" tabindex="0" role="button" aria-label="Qué es: Escribí algo que se entregó o arregló (termotanque, heladera, ollas, canilla…) y la lista muestra solo las escuelas que lo tuvieron, cuántas veces y la última vez. Al abrir una escuela, el detalle ya viene filtrado." data-ayuda="Escribí algo que se entregó o arregló (termotanque, heladera, ollas, canilla…) y la lista muestra solo las escuelas que lo tuvieron, cuántas veces y la última vez. Al abrir una escuela, el detalle ya viene filtrado.">?</span></label>
               <input type="search" id="bCosa" placeholder="ej. termotanque, heladera, ollas" autocomplete="off"></div>
+          </div>
+          <button type="button" class="btn btn-secondary btn-sm btn-filtros" data-plegar="bPleg" aria-expanded="false" aria-controls="bPleg">⚙️ Filtros <span class="cuenta" id="bPlegCuenta"></span><span class="flecha-pleg">▾</span></button>
+          <div class="plegable" id="bPleg">
+          <div class="filtros" style="margin-top:.8rem">
             <div class="campo"><label for="bNivel">Nivel</label><select id="bNivel"></select></div>
             <div class="campo"><label for="bGestion">Gestión</label><select id="bGestion"></select></div>
             <div class="campo"><label for="bLocalidad">Localidad</label><select id="bLocalidad"></select></div>
@@ -100,6 +104,7 @@
           </details>
           <div class="fila" style="margin-top:.6rem"><button type="button" class="btn btn-secondary btn-sm" id="bLimpiar">✖ Limpiar filtros</button>
             <span class="chico muted">Los filtros del buscador se recuerdan en este navegador.</span></div>
+          </div>
         </div>
       </article>
 
@@ -132,6 +137,8 @@
                 <button role="tab" data-m="reg" aria-selected="true">Registros</button><button role="tab" data-m="uni" aria-selected="false">Unidades</button>
               </div></div>
           </div>
+          <button type="button" class="btn btn-secondary btn-sm btn-filtros" data-plegar="gPleg" aria-expanded="false" aria-controls="gPleg">⚙️ Filtros <span class="cuenta" id="gPlegCuenta"></span><span class="flecha-pleg">▾</span></button>
+          <div class="plegable" id="gPleg">
           <div class="campo" style="margin-bottom:.7rem"><label>Años</label><div class="chips" id="gAnios"></div></div>
           <div class="filtros">
             <div class="campo"><label for="gCat">Categoría / rubro</label><select id="gCat"></select></div>
@@ -156,6 +163,7 @@
               <div class="chips" id="gInsts"></div></div></div>
             <label class="check" style="margin-top:.7rem"><input type="checkbox" id="gSinFecha" checked> Incluir registros sin fecha exacta (solo año) en los filtros de fecha</label>
           </details>
+          </div>
           <div class="chips filtros-activos" id="gChips"></div>
         </div>
       </article>
@@ -195,8 +203,12 @@
           <button type="button" class="btn btn-primary btn-sm solo-pc" id="rExcel">⬇️ Excel</button></div>
         </div>
         <div class="card-body">
-          <div class="filtros" style="margin-bottom:.9rem">
+          <div class="filtros filtros-r-q">
             <div class="campo ancho"><label for="rTexto">Buscar</label><input type="search" id="rTexto" placeholder="Detalle, institución, proveedor… (ej. ventilador, EP 12)"></div>
+          </div>
+          <button type="button" class="btn btn-secondary btn-sm btn-filtros" data-plegar="rPleg" aria-expanded="false" aria-controls="rPleg">⚙️ Filtros <span class="cuenta" id="rPlegCuenta"></span><span class="flecha-pleg">▾</span></button>
+          <div class="plegable" id="rPleg">
+          <div class="filtros" style="margin-bottom:.9rem">
             <div class="campo"><label for="rTipo">Tipo</label><select id="rTipo"></select></div>
             <div class="campo"><label for="rAnio">Año</label><select id="rAnio"></select></div>
             <div class="campo"><label for="rCat">Categoría / rubro</label><select id="rCat"></select></div>
@@ -221,6 +233,7 @@
               <label class="check"><input type="checkbox" id="rAgrupar" checked> Agrupar los trabajos de un mismo arreglo</label>
             </div>
           </details>
+          </div>
           <div class="fila" style="margin-bottom:.8rem;align-items:flex-start"><div class="chips filtros-activos" id="rChips" style="flex:1"></div>
             <button type="button" class="btn btn-secondary btn-sm" id="rLimpiar">✖ Limpiar filtros</button></div>
           <div class="tabla-caja" id="rTabla"></div>
@@ -235,6 +248,7 @@
     </section>
   </main>
 
+  <div class="barra-ficha no-print" id="barraFicha" hidden></div>
   <footer class="pie" id="pie">Ficha Escuelas · Tres de Febrero · Entregas, obras y arreglos</footer>
   <div class="toasts" id="toasts" aria-live="polite"></div>
   <div class="tooltip oculto" id="tooltip" role="tooltip"></div>

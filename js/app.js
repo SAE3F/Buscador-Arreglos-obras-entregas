@@ -49,6 +49,30 @@
   function valores(arr, fn) { var s = new Set(); arr.forEach(function (x) { var v = fn(x); if (v != null && v !== '') s.add(v); }); return Array.from(s); }
   function ordenEs(a, b) { return String(a).localeCompare(String(b), 'es', { numeric: true }); }
 
+  /* ---- v0.8.0: celular ---- */
+  var MQ_CEL = window.matchMedia ? matchMedia('(max-width: 640px)') : { matches: false };
+  function esCel() { return MQ_CEL.matches; }
+  var POR_TANDA_CEL = 50;
+  var PLEG_ABIERTOS = new Set();          // qué cajas de filtros están abiertas en el celular (sobrevive a los repintados)
+  function cuentaPleg(id, k) {
+    var c = document.getElementById(id + 'Cuenta'); if (!c) return;
+    c.textContent = k ? String(k) : '';
+    var b = document.querySelector('[data-plegar="' + id + '"]'); if (b) b.classList.toggle('con-filtros', !!k);
+  }
+  function aplicarPleg(id) {
+    var caja = document.getElementById(id), b = document.querySelector('[data-plegar="' + id + '"]'); if (!caja || !b) return;
+    var ab = PLEG_ABIERTOS.has(id); caja.classList.toggle('abierto', ab); b.classList.toggle('abierto', ab); b.setAttribute('aria-expanded', String(ab));
+  }
+  /** "Ver 50 más": devuelve cuántos mostrar; si cambiaron los filtros vuelve a 50 */
+  function tandaCel(obj, firma) {
+    if (obj._firma !== firma) { obj._firma = firma; obj._ver = POR_TANDA_CEL; }
+    return obj._ver;
+  }
+  function botonVerMas(mostrados, total) {
+    return total > mostrados ? '<div class="ver-mas"><span class="chico muted">Mostrando ' + n(mostrados) + ' de ' + n(total) + '</span>' +
+      '<button type="button" class="btn btn-secondary btn-sm" data-ver-mas>Ver ' + n(Math.min(POR_TANDA_CEL, total - mostrados)) + ' más</button></div>' : '';
+  }
+
   /* ---- v0.5.5: proveedor con rubro + campo tipeable ---- */
   var RUBROS = { regs: null, mapa: null };
   function rubrosDe(prov) {          // "Gas, Plomería" — de más a menos registros, de todos sus registros
@@ -184,6 +208,7 @@
   // ───────────────────────── navegación
   function irA(vista, push) {
     S.vista = vista;
+    if (vista !== 'buscador') ocultarBarraFicha();
     $$('#nav button').forEach(function (b) { b.setAttribute('aria-selected', String(b.dataset.vista === vista)); });
     $$('main > section').forEach(function (s) { s.classList.toggle('oculto', s.dataset.vista !== vista); });
     guardarUrl(push);
@@ -191,7 +216,7 @@
   }
   function guardarUrl(push) {
     var p = new URLSearchParams(location.search);
-    p.set('vista', S.vista); p.delete('f');
+    p.set('vista', S.vista); p.delete('f'); p.delete('app');
     if (S.vista === 'buscador' && S.inst) p.set('inst', S.inst); else p.delete('inst');
     var u = location.pathname + '?' + p.toString();
     try { (push ? history.pushState : history.replaceState).call(history, null, '', u); } catch (e) {}
@@ -200,6 +225,7 @@
     var p = new URLSearchParams(location.search);
     var v = p.get('vista'); if (['buscador', 'general', 'registros', 'calidad'].indexOf(v) >= 0) S.vista = v;
     S.inst = p.get('inst') || null;
+    if (p.get('app') === '1') { S.vista = 'buscador'; S.inst = null; }   // la app instalada (celular o compu) siempre abre en el Buscador
   }
   window.addEventListener('popstate', function () { leerUrl(); irA(S.vista, false); });
 
@@ -348,6 +374,7 @@
     var sel = col + '|' + dir; $('#bOrden').value = Array.prototype.some.call($('#bOrden').options, function (o) { return o.value === sel; }) ? sel : '';
     var nMas = ['bInactiva', 'bDesde', 'bHasta', 'bTieneCat', 'bProv'].filter(function (k) { return f[k]; }).length;
     $('#bMasCuenta').textContent = nMas ? nMas + ' activo' + (nMas > 1 ? 's' : '') : '';
+    cuentaPleg('bPleg', nMas + ['bNivel', 'bGestion', 'bLocalidad'].filter(function (k) { return f[k]; }).length + (f.bSolo && f.bSolo !== 'mov' ? 1 : 0));
     $('#listaInstSub').textContent = cosa ? n(arr.length) + ' instituciones con “' + cosa + '” · tocá una para ver el detalle' : n(arr.length) + ' instituciones · tocá una para ver su ficha';
     var cols = cosa ? [['id', 'Institución'], ['nivel', 'Nivel'], ['localidad', 'Localidad'], ['cN', 'Veces', 1], ['cU', 'Unidades', 1], ['cUlt', 'Última vez']]
       : [['id', 'Institución'], ['nivel', 'Nivel'], ['localidad', 'Localidad'], ['E', 'Entregas', 1], ['uE', 'Unidades', 1], ['O', 'Obras', 1], ['A', 'Arreglos', 1], ['ultimo', 'Último']];
@@ -355,11 +382,11 @@
     $('#tablaInst').innerHTML = arr.length ? '<table><thead><tr>' + cols.map(function (c) {
       return '<th class="ord' + (c[2] ? ' num' : '') + (/^(nivel|localidad)$/.test(c[0]) ? ' solo-pc' : '') + '" data-col="' + c[0] + '">' + c[1] + (col === c[0] ? ' <span class="flecha">' + (dir > 0 ? '▲' : '▼') + '</span>' : '') + '</th>';
     }).join('') + '</tr></thead><tbody>' + vis.map(function (i) {
-      if (cosa) return '<tr><td class="inst">' + linkInst(i.id) + '</td><td class="solo-pc">' + esc(i.nivel) + '</td><td class="solo-pc">' + esc(i.localidad) + '</td><td class="num"><b>' + n(i.cN) + '</b></td><td class="num">' + (i.cU ? n(i.cU) : '—') +
-        '</td><td class="fecha">' + esc(i.cUltTxt || '—') + '</td></tr>';
-      return '<tr><td class="inst">' + linkInst(i.id) + (i.enBase ? '' : ' <span title="No está en ESTABLECIMIENTOS">⚠️</span>') + '</td><td class="solo-pc">' + esc(i.nivel) + '</td><td class="solo-pc">' + esc(i.localidad) +
-        '</td><td class="num">' + n(i.E) + '</td><td class="num">' + n(i.uE) + '</td><td class="num">' + n(i.O) + '</td><td class="num">' + n(i.A) +
-        '</td><td class="fecha">' + (i.ultimo ? (i.ultimo.slice(5) === '00-00' ? i.ultimo.slice(0, 4) : U.fecha(i.ultimo)) : '—') + '</td></tr>';
+      if (cosa) return '<tr class="fila-inst" data-abrir="' + esc(i.id) + '"><td class="inst c-i">' + linkInst(i.id) + '</td><td class="solo-pc">' + esc(i.nivel) + '</td><td class="solo-pc">' + esc(i.localidad) + '</td><td class="num c-cN"><b>' + n(i.cN) + '</b></td><td class="num c-cU">' + (i.cU ? n(i.cU) : '—') +
+        '</td><td class="fecha c-cUlt">' + esc(i.cUltTxt || '—') + '</td></tr>';
+      return '<tr class="fila-inst" data-abrir="' + esc(i.id) + '"><td class="inst c-i">' + linkInst(i.id) + (i.enBase ? '' : ' <span title="No está en ESTABLECIMIENTOS">⚠️</span>') + '</td><td class="solo-pc">' + esc(i.nivel) + '</td><td class="solo-pc">' + esc(i.localidad) +
+        '</td><td class="num c-E">' + n(i.E) + '</td><td class="num c-uE">' + n(i.uE) + '</td><td class="num c-O">' + n(i.O) + '</td><td class="num c-A">' + n(i.A) +
+        '</td><td class="fecha c-ult">' + (i.ultimo ? (i.ultimo.slice(5) === '00-00' ? i.ultimo.slice(0, 4) : U.fecha(i.ultimo)) : '—') + '</td></tr>';
     }).join('') + '</tbody></table>' + (arr.length > vis.length ? '<div class="vacio chico">Mostrando 400 de ' + n(arr.length) + '. Usá el buscador o los filtros para achicar la lista.</div>' : '')
       : '<div class="vacio"><span class="grande">🔍</span>' + (cosa ? 'Ninguna institución tuvo “' + esc(cosa) + '” con esos filtros' : 'No hay instituciones con esos filtros') + '</div>';
     $$('#tablaInst th.ord').forEach(function (th) {
@@ -376,6 +403,7 @@
     var i = S.inst && Datos.inst.get(S.inst);
     $('#listaInst').classList.toggle('oculto', !!i);
     if (!i) {
+      ocultarBarraFicha();
       cont.innerHTML = S.inst ? '<div class="aviso naranja" style="margin-bottom:1rem">No encontré la institución “' + esc(S.inst) + '”. Buscala de nuevo arriba.</div>' : '';
       return;
     }
@@ -397,8 +425,8 @@
       ['👥 Matrícula / cupo SAE', i.matricula ? n(i.matricula) : ''],
       ['🍽️ Servicio SAE', i.servicio]
     ].filter(function (e) { return e[1]; }).map(function (e) {
-      return '<span class="etiqueta' + (e[2] ? ' destacada' : '') + '">' + e[0] + ': <b>' + esc(e[1]) + '</b></span>';
-    }).join('');
+      return '<span class="etiqueta' + (e[2] ? ' destacada' : ' secundaria') + '">' + e[0] + ': <b>' + esc(e[1]) + '</b></span>';
+    }).join('') + '<button type="button" class="btn btn-secondary btn-sm solo-cel-flex" id="fMasDatos" aria-expanded="false">➕ Más datos</button>';
     var alias = (i.alias || []).length ? '<div class="chico muted" style="margin-top:.65rem">También aparece escrita como: ' + i.alias.map(esc).join(' · ') + '</div>' : '';
 
     var html = '<article class="card sec"><div class="card-body"><div class="ficha-cab"><div class="ficha-info">' +
@@ -406,17 +434,17 @@
       '<div class="etiquetas">' + etiq + '</div>' + alias + '</div>' +
       '<div class="ficha-acciones no-print"><button class="btn btn-primary btn-sm" id="fVisita">📄 Ficha para visita</button>' +
       '<a class="btn btn-secondary btn-sm" href="' + esc(urlComoLlegar(i)) + '" target="_blank" rel="noopener" title="Ruta en Google Maps desde la Municipalidad (Alberdi 4840, Caseros)">🧭 Cómo llegar</a>' +
-      '<a class="btn btn-secondary btn-sm" href="' + esc(urlMapa(i)) + '" target="_blank" rel="noopener" title="Abrir el mapa de SAE Gestión en esta escuela">🗺️ Ver en el mapa</a>' +
+      '<a class="btn btn-secondary btn-sm solo-pc" href="' + esc(urlMapa(i)) + '" target="_blank" rel="noopener" title="Abrir el mapa de SAE Gestión en esta escuela">🗺️ Ver en el mapa</a>' +
       menuPlanillas(i, regs) + '<button class="btn btn-secondary btn-sm" id="fLink">🔗 Copiar link</button><button class="btn btn-secondary btn-sm solo-pc" id="fExcel">⬇️ Excel</button>' +
       '<button class="btn btn-secondary btn-sm" id="fCerrar" title="Volver a la lista">✕</button></div></div></div></article>';
 
-    html += '<div class="kpis">' +
+    html += '<div class="kpis kpis-ficha">' +
       kpi('E', '📦 Entregas', n(por.E.length), n(u) + ' unidades') +
       kpi('O', '🏗️ Obras', n(por.O.length), resumenCats(por.O)) +
       kpi('A', '🛠️ Arreglos', n(por.A.length), resumenCats(por.A)) +
-      '<div class="kpi"><div class="et">🕒 Último movimiento</div><div class="val" style="font-size:1.25rem">' + (ult ? fechaReg(ult) : '—') + '</div><div class="sub">' +
+      '<div class="kpi kpi-ult"><div class="et">🕒 <span class="solo-pc">Último movimiento</span><span class="solo-cel">Último</span></div><div class="val" style="font-size:1.25rem">' + (ult ? fechaReg(ult) : '—') + '</div><div class="sub">' +
       (ult ? esc(T[ult.t].uno + ' · ' + ult.cat) : 'Sin registros') + '</div></div>' +
-      '<div class="kpi"><div class="et">📅 En ' + anioActual + '</div><div class="val">' + n(esteAnio) + '</div><div class="sub">registros este año</div></div></div>';
+      '<div class="kpi kpi-anio"><div class="et">📅 En ' + anioActual + '</div><div class="val">' + n(esteAnio) + '</div><div class="sub">registros este año</div></div></div>';
 
     html += '<article class="card" id="fReclamos"><div class="card-header"><div><h2>📣 Últimos reclamos</h2><p class="card-subtitle" id="fRecSub">Cargando…</p></div>' +
       '<div class="fila"><span class="chico muted">Mostrar últimos</span><div class="pestanas chicas" id="fRecN" role="tablist">' + [5, 10, 20].map(function (k) {
@@ -433,8 +461,10 @@
     html += '<article class="card"><div class="card-header"><div><h2>📋 Detalle</h2><p class="card-subtitle" id="fSub"></p></div>' +
       '<div class="pestanas chicas" id="fTabs" role="tablist">' + TIPOS.map(function (t) {
         return '<button role="tab" data-t="' + t + '" aria-selected="' + (S.ficha.tab === t) + '">' + T[t].icono + ' ' + T[t].nombre + ' <span class="cuenta">' + por[t].length + '</span></button>';
-      }).join('') + '</div></div><div class="card-body"><div class="filtros" style="margin-bottom:.8rem">' +
-      '<div class="campo ancho"><label for="fQ">Buscar en el detalle</label><input type="search" id="fQ" placeholder="ej. ventilador, termotanque" value="' + esc(S.ficha.q) + '"></div>' +
+      }).join('') + '</div></div><div class="card-body"><div class="filtros filtros-f-q">' +
+      '<div class="campo ancho"><label for="fQ">Buscar en el detalle</label><input type="search" id="fQ" placeholder="ej. ventilador, termotanque" value="' + esc(S.ficha.q) + '"></div></div>' +
+      '<button type="button" class="btn btn-secondary btn-sm btn-filtros" data-plegar="fPleg" aria-expanded="false" aria-controls="fPleg">⚙️ Filtros <span class="cuenta" id="fPlegCuenta"></span><span class="flecha-pleg">▾</span></button>' +
+      '<div class="plegable" id="fPleg"><div class="filtros" style="margin-bottom:.8rem">' +
       '<div class="campo"><label for="fPeriodo">Período</label><select id="fPeriodo">' + [['', 'Todo'], ['mes', 'Este mes'], ['3m', 'Últimos 3 meses'], ['anio', 'Este año'], ['pasado', 'Año pasado'], ['pers', 'Elegir fechas…']].map(function (o) {
         return '<option value="' + o[0] + '"' + (S.ficha.periodo === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></div>' +
       '<div class="campo' + (S.ficha.periodo === 'pers' ? '' : ' oculto') + '" id="fFechas"><label>Desde / hasta</label><div class="fila" style="gap:.3rem;flex-wrap:nowrap">' +
@@ -446,7 +476,7 @@
       '<div class="campo"><label for="fOrden">Ordenar</label><select id="fOrden">' + [['nuevo', 'Más nuevo primero'], ['viejo', 'Más viejo primero'], ['cant', 'Mayor cantidad']].map(function (o) {
         return '<option value="' + o[0] + '"' + (S.ficha.orden === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></div></div>' +
       '<div class="fila" style="margin:-.2rem 0 .8rem;justify-content:space-between"><label class="check"><input type="checkbox" id="fSinFecha"' + (S.ficha.sinFecha ? ' checked' : '') +
-      '> Incluir registros sin fecha exacta (solo año)</label><button type="button" class="btn btn-secondary btn-sm" id="fLimpiar">✖ Limpiar filtros</button></div>' +
+      '> Incluir registros sin fecha exacta (solo año)</label><button type="button" class="btn btn-secondary btn-sm" id="fLimpiar">✖ Limpiar filtros</button></div></div>' +
       '<div class="tabla-caja alto-max" id="fTabla"></div></div></article>';
     cont.innerHTML = html;
 
@@ -468,6 +498,9 @@
     $('#fCerrar').onclick = function () { S.inst = null; guardarUrl(true); pintar(); };
     $('#fExcel').onclick = function () { excelEscuela(i, regs, opcionesVisita(), false); };
     $('#fVisita').onclick = function () { abrirVisita(i, regs); };
+    $('#fMasDatos').onclick = function () { var c = this.closest('.etiquetas'), ab = !c.classList.contains('ver-todo'); c.classList.toggle('ver-todo', ab); this.setAttribute('aria-expanded', String(ab)); this.textContent = ab ? '➖ Menos datos' : '➕ Más datos'; };
+    aplicarPleg('fPleg');
+    barraFicha(i, regs);
     $('#fRecN').onclick = function (ev) { var b = ev.target.closest('[data-n]'); if (!b) return; try { localStorage.setItem('sae-reclamos-n', b.dataset.n); } catch (e) {}
       $$('#fRecN button').forEach(function (x) { x.setAttribute('aria-selected', String(x === b)); }); pintarReclamos(i); };
     pintarReclamos(i);
@@ -862,7 +895,10 @@
       (sinF ? ' · ' + n(sinF) + ' sin fecha exacta incluidos por año' : '') +
       (lista.length < rs.length ? ' · agrupados por día en ' + n(lista.length) + ' filas (tocá una para ver el detalle)' : '');
     $$('.kpi[data-kpi]').forEach(function (k) { k.onclick = function () { S.ficha.tab = k.dataset.kpi; S.ficha.cat = ''; S.ficha.prov = ''; pintarFicha(); $('#fTabla').scrollIntoView({ behavior: 'smooth', block: 'center' }); }; });
-    $('#fTabla').innerHTML = lista.length ? tablaRegs(lista, false) : '<div class="vacio"><span class="grande">' + T[t].icono + '</span>No hay ' + T[t].nombre.toLowerCase() + ' con estos filtros</div>';
+    cuentaPleg('fPleg', ['periodo', 'anio', 'mes', 'cat', 'prov'].filter(function (k) { return F[k]; }).length + (F.orden && F.orden !== 'nuevo' ? 1 : 0) + (F.sinFecha ? 0 : 1));
+    var verF = esCel() ? tandaCel(F, [S.inst, t, F.q, F.periodo, F.desde, F.hasta, F.anio, F.mes, F.cat, F.prov, F.orden, F.sinFecha].join('|')) : lista.length;
+    $('#fTabla').innerHTML = lista.length ? tablaRegs(lista.slice(0, verF), false) + botonVerMas(Math.min(verF, lista.length), lista.length) : '<div class="vacio"><span class="grande">' + T[t].icono + '</span>No hay ' + T[t].nombre.toLowerCase() + ' con estos filtros</div>';
+    var vm = $('#fTabla [data-ver-mas]'); if (vm) vm.onclick = function () { F._ver += POR_TANDA_CEL; pintarTablaFicha(regs); };
   }
 
   /** Línea de tiempo de la ficha: por año (todo) o por mes (un año; solo registros con fecha exacta) */
@@ -1051,6 +1087,7 @@
       return '<button type="button" class="chip activo" data-k="' + k + '" title="Quitar este filtro">' + esc(x[0]) + ' <span aria-hidden="true">✕</span></button>';
     }).join('') : '';
     cont.onclick = function (e) { var b = e.target.closest('[data-k]'); if (b) { lista[+b.dataset.k][1](); alQuitar(); } };
+    if (cont.id === 'gChips' || cont.id === 'rChips') cuentaPleg(cont.id.charAt(0) + 'Pleg', lista.length);
   }
   var NOM_PERIODO = { mes: 'Este mes', '3m': 'Últimos 3 meses', anio: 'Este año', pasado: 'Año pasado' };
   function textoPeriodo(o) { return o.periodo === 'pers' ? 'Fechas: ' + (o.desde ? U.fechaLarga(o.desde) : '…') + ' a ' + (o.hasta ? U.fechaLarga(o.hasta) : '…') : NOM_PERIODO[o.periodo]; }
@@ -1373,12 +1410,14 @@
     $('#rSub').textContent = n(sueltos.length) + ' registros · ' + n(u) + ' unidades' + (sueltos.length !== Datos.regs.length ? ' (de ' + n(Datos.regs.length) + ')' : '') +
       (nGr ? ' · ' + n(nGr) + ' grupos por día (tocá uno para ver el detalle)' : '');
     var pags = Math.max(1, Math.ceil(rs.length / POR_PAGINA)); if (r.pag >= pags) r.pag = pags - 1;
-    var vis = rs.slice(r.pag * POR_PAGINA, (r.pag + 1) * POR_PAGINA);
+    var cel = esCel(), verR = cel ? tandaCel(r, ['q', 'tipo', 'anio', 'cat', 'prov', 'fuente', 'col', 'dir', 'periodo', 'desde', 'hasta', 'sinFecha', 'mes', 'inst', 'nivel', 'gestion', 'localidad', 'cantMin', 'agrupar'].map(function (k) { return r[k]; }).join('|')) : 0;
+    var vis = cel ? rs.slice(0, verR) : rs.slice(r.pag * POR_PAGINA, (r.pag + 1) * POR_PAGINA);
     $('#rTabla').innerHTML = vis.length ? tablaRegs(vis, true, { col: col, dir: dir }) : '<div class="vacio"><span class="grande">🔍</span>No hay registros con estos filtros</div>';
-    $('#rPaginas').innerHTML = rs.length > POR_PAGINA ? '<span>Mostrando ' + n(r.pag * POR_PAGINA + 1) + '–' + n(r.pag * POR_PAGINA + vis.length) + ' de ' + n(rs.length) + '</span><span class="fila">' +
+    $('#rPaginas').innerHTML = cel ? botonVerMas(vis.length, rs.length) : rs.length > POR_PAGINA ? '<span>Mostrando ' + n(r.pag * POR_PAGINA + 1) + '–' + n(r.pag * POR_PAGINA + vis.length) + ' de ' + n(rs.length) + '</span><span class="fila">' +
       '<button class="btn btn-secondary btn-sm" data-p="-1"' + (r.pag ? '' : ' disabled') + '>◀ Anterior</button><span>Página ' + (r.pag + 1) + ' de ' + pags + '</span>' +
       '<button class="btn btn-secondary btn-sm" data-p="1"' + (r.pag < pags - 1 ? '' : ' disabled') + '>Siguiente ▶</button></span>' : '';
-    $$('#rPaginas button').forEach(function (b) { b.onclick = function () { r.pag += +b.dataset.p; pintarRegistros(); $('#rTabla').scrollIntoView({ block: 'start', behavior: 'smooth' }); }; });
+    $$('#rPaginas button[data-p]').forEach(function (b) { b.onclick = function () { r.pag += +b.dataset.p; pintarRegistros(); $('#rTabla').scrollIntoView({ block: 'start', behavior: 'smooth' }); }; });
+    var vmR = $('#rPaginas [data-ver-mas]'); if (vmR) vmR.onclick = function () { r._ver += POR_TANDA_CEL; pintarRegistros(); };
     $$('#rTabla th.ord').forEach(function (th) {
       th.onclick = function () { var c = th.dataset.col; if (r.col === c) r.dir *= -1; else { r.col = c; r.dir = c === 'orden' || c === 'cant' ? -1 : 1; } r.pag = 0; pintarRegistros(); };
     });
@@ -1485,6 +1524,15 @@
     restaurarFiltrosR();
     aplicarFiltrosUrl();
     $$('#nav button').forEach(function (b) { b.onclick = function () { irA(b.dataset.vista, true); }; });
+    // celular: abrir/cerrar cajas de filtros, tarjetas de escuelas y reclamos
+    document.addEventListener('click', function (e) {
+      var pl = e.target.closest('[data-plegar]');
+      if (pl) { var id = pl.dataset.plegar; if (PLEG_ABIERTOS.has(id)) PLEG_ABIERTOS.delete(id); else PLEG_ABIERTOS.add(id); aplicarPleg(id); return; }
+      var rec = e.target.closest('.reclamo');
+      if (rec && esCel() && !e.target.closest('a,button')) { rec.classList.toggle('abierto'); return; }
+      var fi = e.target.closest('tr.fila-inst');
+      if (fi && !e.target.closest('a')) { abrirFicha(fi.dataset.abrir); }
+    });
     // links a fichas desde cualquier tabla
     document.addEventListener('click', function (e) {
       var a = e.target.closest('[data-inst]'); if (a) { e.preventDefault(); abrirFicha(a.dataset.inst); return; }
@@ -1617,6 +1665,23 @@
     irA(S.vista, false);
     Datos.cargar(false);
   }
+  // ───────────────────────── Celular: barra fija de la ficha (v0.8.0)
+  function barraFicha(i, regs) {
+    var b = $('#barraFicha'); if (!b) return;
+    b.innerHTML = '<button type="button" data-b="volver">←<span>Volver</span></button>' +
+      '<a href="' + esc(urlComoLlegar(i)) + '" target="_blank" rel="noopener">🧭<span>Cómo llegar</span></a>' +
+      '<button type="button" data-b="visita" class="principal">📄<span>Ficha / PDF</span></button>' +
+      '<button type="button" data-b="link">🔗<span>Link</span></button>';
+    b.hidden = false; document.body.classList.add('con-ficha');
+    b.onclick = function (e) {
+      var x = e.target.closest('[data-b]'); if (!x) return;
+      if (x.dataset.b === 'volver') { S.inst = null; guardarUrl(true); pintar(); window.scrollTo({ top: 0 }); }
+      else if (x.dataset.b === 'visita') abrirVisita(i, regs);
+      else if (x.dataset.b === 'link') copiarTexto(location.origin + location.pathname + '?vista=buscador&inst=' + encodeURIComponent(i.id), '🔗 Link de ' + i.id + ' copiado');
+    };
+  }
+  function ocultarBarraFicha() { var b = $('#barraFicha'); if (b) { b.hidden = true; b.innerHTML = ''; } document.body.classList.remove('con-ficha'); }
+
   // ───────────────────────── App instalable y sin internet (v0.7.0)
   function prepararApp() {
     if ('serviceWorker' in navigator && (location.protocol === 'https:' || /^(localhost|127\.0\.0\.1)$/.test(location.hostname))) {
