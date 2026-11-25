@@ -293,3 +293,80 @@ select:disabled { opacity: .55; }
 /* Copiar link (cuando el navegador no deja copiar solo) */
 .caja-copiar { position: fixed; inset: 0; z-index: 400; background: rgba(0, 13, 29, .45); display: flex; align-items: center; justify-content: center; padding: 1rem; }
 .caja-copiar .card { width: min(520px, 100%); margin: 0; }
+
+/* ── v0.5.0 */
+/* Botones de la ficha */
+.ficha-acciones { display: flex; flex-wrap: wrap; gap: .45rem; align-items: flex-start; justify-content: flex-end; max-width: 520px; }
+a.btn { text-decoration: none; }
+
+/* Filtros activos como etiquetas */
+.filtros-activos { margin-top: .7rem; align-items: center; }
+.filtros-activos:empty { display: none; }
+.chip.activo { background: var(--primary-light); border-color: var(--primary); color: var(--primary); }
+html.dark .chip.activo { color: var(--text-primary); }
+
+/* Arreglos agrupados */
+.tabla-fija tr.fila-grupo { cursor: pointer; background: var(--bg-subtle); }
+.tabla-fija tr.fila-grupo:hover td { background: var(--primary-light); }
+.tabla-fija tr.fila-grupo:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.flecha-grupo { display: inline-block; transition: transform .15s; color: var(--primary); font-size: .8rem; }
+tr.fila-grupo.abierto .flecha-grupo { transform: rotate(90deg); }
+.tabla-fija tr.fila-hijo td { background: var(--bg-card); font-size: .86rem; }
+.tabla-fija tr.fila-hijo td:first-child { box-shadow: inset 3px 0 0 var(--c-A); }
+.sangria { color: var(--text-muted); margin-left: .6rem; }
+
+/* Reclamos */
+.lista-reclamos { display: flex; flex-direction: column; gap: .5rem; }
+.reclamo { border: 1px solid var(--border); border-left: 4px solid var(--rc, var(--border-strong)); border-radius: 10px; padding: .55rem .75rem; background: var(--bg-card); font-size: .86rem; }
+.reclamo.est-ok { --rc: var(--success); } .reclamo.est-pend { --rc: var(--accent); } .reclamo.est-gestion { --rc: var(--primary); } .reclamo.est-otro { --rc: var(--text-muted); }
+.rec-cab { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem .6rem; }
+.rec-det { margin-top: .25rem; color: var(--text-primary); }
+.rec-res { margin-top: .25rem; }
+.estado-pill { font-size: .72rem; font-weight: 700; border-radius: 999px; padding: .1rem .55rem; color: #fff; background: var(--rc, var(--text-muted)); white-space: nowrap; }
+html.dark .estado-pill { color: #0f172a; }
+
+/* Ventana "Ficha para visita" */
+.modal-fondo { position: fixed; inset: 0; z-index: 450; background: rgba(0, 13, 29, .5); display: flex; align-items: center; justify-content: center; padding: 1rem; }
+.modal { width: min(760px, 100%); max-height: calc(100vh - 2rem); display: flex; flex-direction: column; margin: 0; }
+.modal-cuerpo { overflow-y: auto; display: flex; flex-direction: column; gap: .8rem; }
+.modal fieldset { border: 1px solid var(--border); border-radius: 10px; padding: .6rem .8rem .7rem; margin: 0; }
+.modal legend { font-weight: 700; font-size: .82rem; color: var(--primary); padding: 0 .3rem; }
+.opciones { display: flex; flex-wrap: wrap; gap: .45rem 1.1rem; }
+.opciones + .opciones { margin-top: .5rem; padding-top: .5rem; border-top: 1px dashed var(--border); }
+.modal .check { color: var(--text-primary); font-size: .86rem; }
+.modal-pie { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; justify-content: flex-end; padding: .8rem 1.25rem; border-top: 1px solid var(--border); }
+.modal-pie > .chico { flex: 1 1 100%; }
+.modal-pie > .espacio { display: none; }
+body.con-modal { overflow: hidden; }
+
+/* Impresión de la ficha para visita */
+#impresion { display: none; }
+@media print {
+  body.imprimiendo > *:not(#impresion) { display: none !important; }
+  body.imprimiendo #impresion { display: block; }
+  body.imprimiendo { background: #fff !important; }
+}
+.impr { color: #111; font: 10pt/1.35 Inter, Arial, sans-serif; }
+.impr-cab { display: flex; align-items: center; gap: 12px; border-bottom: 3px solid #163C68; padding-bottom: 8px; margin-bottom: 10px; }
+.impr-cab img { width: 40px; height: 40px; }
+.impr-cab h1 { font: 800 18pt Montserrat, Arial, sans-serif; color: #163C68; margin: 0; }
+.impr-org { font-size: 8.5pt; color: #F69321; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; }
+.impr-sub { color: #333; font-weight: 600; }
+.impr-fecha { margin-left: auto; text-align: right; font-size: 8.5pt; color: #555; }
+.impr section { margin: 10px 0 12px; }
+.impr h2 { font: 700 12pt Montserrat, Arial, sans-serif; color: #163C68; margin: 0 0 5px; border-bottom: 1px solid #d5dde8; padding-bottom: 2px; break-after: avoid; }
+.impr h2 small { font-weight: 500; color: #555; font-size: 9pt; }
+.impr table { width: 100%; border-collapse: collapse; font-size: 8.5pt; }
+.impr th { text-align: left; background: #eef2f7; color: #163C68; font-weight: 700; padding: 3px 5px; border-bottom: 1px solid #c9d3e0; }
+.impr td { padding: 3px 5px; border-bottom: 1px solid #e6eaf0; vertical-align: top; }
+.impr tr { break-inside: avoid; }
+.impr td.num, .impr th.num { text-align: right; }
+.impr td.nw { white-space: nowrap; }
+.impr .chico { font-size: 8.5pt; color: #444; }
+.impr a { color: #163C68; }
+.impr-datos { display: grid; grid-template-columns: max-content 1fr max-content 1fr; gap: 3px 12px; margin: 0; }
+.impr-datos dt { color: #555; font-weight: 600; } .impr-datos dd { margin: 0; font-weight: 600; }
+.impr-kpis { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.impr-kpis div { border: 1px solid #d5dde8; border-radius: 6px; padding: 5px 7px; }
+.impr-kpis b { display: block; font-size: 13pt; color: #163C68; }
+.impr-kpis span { font-size: 8pt; color: #444; }

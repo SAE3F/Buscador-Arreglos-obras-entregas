@@ -11,6 +11,14 @@
     if (!ex) return null;
     return ex[normClave(i.id)] || ex[normClave(i.nombre)] || ex[normClave(i.completo)] || null;
   }
+  // Localidad siempre en MAYÚSCULAS y sin tildes (la Ñ se conserva): "Saenz Peña" y "SAENZ PEÑA" quedan iguales
+  function mayus(s) {
+    return String(s || '').replace(/\s+/g, ' ').trim().toUpperCase().replace(/[ÁÀÄÂ]/g, 'A').replace(/[ÉÈËÊ]/g, 'E').replace(/[ÍÌÏÎ]/g, 'I').replace(/[ÓÒÖÔ]/g, 'O').replace(/[ÚÙÜÛ]/g, 'U');
+  }
+  function coords(i) {
+    var c = window.ESCUELAS_COORDS;
+    return c ? (c[normClave(i.id)] || c[normClave(i.nombre)] || c[normClave(i.completo)] || null) : null;
+  }
   function enriquecer(i) {
     var ex = buscarExtra(i);
     if (ex) {
@@ -24,6 +32,10 @@
       i.directora = i.directora || '';
       i.cargo = i.cargo || '';
     }
+    i.localidad = mayus(i.localidad);
+    i.cue = String(i.cue || '').replace(/\.0+$/, '');
+    var co = coords(i);
+    i.lat = co ? co[0] : null; i.lng = co ? co[1] : null; i.nombreMapa = co ? co[2] : '';
     i.busca = U.norm([i.id, i.nombre, i.completo, i.localidad, i.direccion, i.directora].concat(i.alias || []).join(' '));
   }
 
@@ -52,6 +64,7 @@
     });
     regs.sort(function (a, b) { return a.orden < b.orden ? 1 : a.orden > b.orden ? -1 : 0; });
     Datos.regs = regs; Datos.inst = inst; Datos.avisos = j.avisos || []; Datos.hojas = j.hojas || {};
+    Datos.recPrueba = j.reclamosPrueba || null; Datos.recCache = new Map();
     Datos.meta = { version: j.version, generado: j.generado, montos: !!j.montos, resumen: j.resumen };
     Datos.listo = true;
     Datos.oyentes.forEach(function (f) { try { f(); } catch (e) { console.error(e); } });
@@ -141,6 +154,25 @@
     for (var i = 0; i < 3; i++) { var d = (x[i] || 0) - (y[i] || 0); if (d) return d < 0 ? -1 : 1; }
     return 0;
   }
+  /** Reclamos de una institución (se piden al script recién cuando se abre la ficha). Devuelve una promesa. */
+  Datos.reclamos = function (id) {
+    if (Datos.recCache && Datos.recCache.has(id)) return Promise.resolve(Datos.recCache.get(id));
+    var vacio = { total: 0, abiertos: 0, abiertoMasViejo: '', items: [] };
+    function guardar(r) {
+      r = r || vacio;
+      r.items = (r.items || []).map(function (x) {
+        return { fecha: x[0], estado: x[1], tipo: x[2], cat: x[3], sub: x[4], det: x[5], prod: x[6], serv: x[7], prov: x[8], resp: x[9], fres: x[10], acc: x[11], prob: x[12], ref: ['RE', x[13], 1] };
+      });
+      Datos.recCache.set(id, r); return r;
+    }
+    if (Datos.recPrueba) return Promise.resolve(guardar(Datos.recPrueba[id]));
+    if (!C.SCRIPT_URL) return Promise.reject(new Error('Falta la URL del script'));
+    var url = C.SCRIPT_URL + (C.SCRIPT_URL.indexOf('?') < 0 ? '?' : '&') + 'accion=reclamos&inst=' + encodeURIComponent(id) + '&t=' + Date.now();
+    return fetch(url, { cache: 'no-store' }).then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }).then(function (j) {
+      if (!j || !j.ok) throw new Error((j && j.error) || 'El script no devolvió reclamos (¿está en la versión 1.2.0?)');
+      return guardar(j.reclamos);
+    });
+  };
   Datos.alCambiar = function (f) { Datos.oyentes.push(f); };
   setInterval(mostrarEstado, 60000);
   window.Datos = Datos;

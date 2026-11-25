@@ -11,7 +11,7 @@
  * (Implementar → Administrar implementaciones → editar → Nueva versión).
  */
 
-var VERSION_SCRIPT = '1.1.0';
+var VERSION_SCRIPT = '1.2.0';
 
 // ─────────────────────────────── Planillas ───────────────────────────────
 var PLANILLAS = {
@@ -29,6 +29,11 @@ var HOJAS = {
   items:            { planilla: 'facturacion', hoja: 'FACTURACION ITEMS',     cod: 'IT' },
   unidades:         { planilla: 'facturacion', hoja: 'FACTURACION UNIDADES',  cod: 'UN' }
 };
+
+// Reclamos (SAE | Tablero Gestión → Reclamos). SOLO LECTURA. No viajan con el resto: la página los pide por escuela
+// (?accion=reclamos&inst=EP 12) cuando se abre una ficha. Se guardan los últimos MAX_RECLAMOS de cada escuela.
+var RECLAMOS = { planilla: 'tablero', hoja: 'Reclamos', cod: 'RE' };
+var MAX_RECLAMOS = 20;
 
 // Montos y N° de factura: se dejan preparados pero APAGADOS. Cuando el equipo decida
 // mostrarlos, se pone en true y se vuelve a publicar (la página ya sabe leerlos).
@@ -58,6 +63,10 @@ var SERVICIOS_UNIDADES = [
 function doGet(e) {
   var p = (e && e.parameter) || {};
   if (p.accion === 'version') return json_({ ok: true, version: VERSION_SCRIPT });
+  if (p.accion === 'reclamos') {
+    try { return json_(reclamosDe_(p.inst || '', p.actualizar === '1')); }
+    catch (err) { return json_({ ok: false, version: VERSION_SCRIPT, error: String(err && err.message || err) }); }
+  }
   try {
     var datos = null;
     if (p.actualizar !== '1') datos = leerCache_();
@@ -92,6 +101,11 @@ function leerHojas_() {
     out[k] = sh ? sh.getDataRange().getValues() : null;
     out.meta[h.cod] = { id: PLANILLAS[h.planilla], gid: sh ? sh.getSheetId() : null, hoja: h.hoja, planilla: ss.getName() };
   });
+  try {
+    var ssr = abiertas[RECLAMOS.planilla] || SpreadsheetApp.openById(PLANILLAS[RECLAMOS.planilla]);
+    var shr = ssr.getSheetByName(RECLAMOS.hoja);
+    if (shr) out.meta[RECLAMOS.cod] = { id: PLANILLAS[RECLAMOS.planilla], gid: shr.getSheetId(), hoja: RECLAMOS.hoja, planilla: ssr.getName() };
+  } catch (e) {}
   out.zona = Session.getScriptTimeZone() || 'America/Argentina/Buenos_Aires';
   return out;
 }
@@ -115,6 +129,66 @@ function leerCache_() {
     for (var j = 0; j < n; j++) { if (all['sae_' + j] == null) return null; s += all['sae_' + j]; }
     return s;
   } catch (e) { return null; }
+}
+
+// ─────────────────────────────── Reclamos por escuela ───────────────────────────────
+function reclamosDe_(nombre, rehacer) {
+  var id = idInst_(nombre);
+  if (!id) return { ok: false, version: VERSION_SCRIPT, error: 'Falta la institución' };
+  var c = CacheService.getScriptCache();
+  if (!rehacer && c.get('rec_listo') === VERSION_SCRIPT) {
+    var t = c.get('rec_' + id);
+    return { ok: true, version: VERSION_SCRIPT, inst: id, reclamos: t ? JSON.parse(t) : { total: 0, abiertos: 0, items: [] } };
+  }
+  var sh = SpreadsheetApp.openById(PLANILLAS[RECLAMOS.planilla]).getSheetByName(RECLAMOS.hoja);
+  if (!sh) return { ok: false, version: VERSION_SCRIPT, error: 'No encontré la hoja ' + RECLAMOS.hoja };
+  var porInst = construirReclamos(sh.getDataRange().getValues(), Session.getScriptTimeZone());
+  // Se guarda cada escuela por separado (Google limita el tamaño de cada valor)
+  var claves = Object.keys(porInst);
+  try {
+    for (var i = 0; i < claves.length; i += 50) {
+      var o = {}; claves.slice(i, i + 50).forEach(function (k) { o['rec_' + k] = JSON.stringify(porInst[k]); });
+      c.putAll(o, MINUTOS_CACHE * 60);
+    }
+    c.put('rec_listo', VERSION_SCRIPT, MINUTOS_CACHE * 60);
+  } catch (e) {}
+  return { ok: true, version: VERSION_SCRIPT, inst: id, reclamos: porInst[id] || { total: 0, abiertos: 0, items: [] } };
+}
+
+/**
+ * Tabla de la hoja Reclamos → { idInstitucion: { total, abiertos, abiertoMasViejo, items:[…] } }
+ * item: [0 fecha AAAA-MM-DD, 1 estado, 2 tipo, 3 categoría, 4 subcategoría, 5 detalle, 6 producto, 7 servicio, 8 proveedor,
+ *        9 responsable, 10 fecha resolución, 11 acciones, 12 problema, 13 fila]
+ * (no se mandan patologías, cupos ni horarios)
+ */
+function construirReclamos(t, zona) {
+  zona = zona || 'America/Argentina/Buenos_Aires';
+  var out = {};
+  if (!t || !t.length) return out;
+  var c = t[0];
+  var C = { fecha: cols_(c, ['FECHA'], 0), esc: cols_(c, ['ESCUELA'], 1), prov: cols_(c, ['PROVEEDOR SAE', 'PROVEEDOR'], 2), serv: cols_(c, ['SERVICIO'], 3),
+    tipo: cols_(c, ['TIPO'], 4), cat: cols_(c, ['CATEGORIA'], 5), sub: cols_(c, ['Subcategoria'], 6), det: cols_(c, ['DETALLE'], 7), prod: cols_(c, ['PRODUCTO'], 8),
+    est: cols_(c, ['ESTADO'], 11), resp: cols_(c, ['Responsable'], 12), fres: cols_(c, ['Fecha resolución', 'Fecha resolucion'], 13),
+    acc: cols_(c, ['ACCIONES'], 14), prob: cols_(c, ['PROBLEMA'], 15) };
+  function corto(v, n) { v = txt_(v); return v.length > n ? v.slice(0, n - 1) + '…' : v; }
+  for (var f = 1; f < t.length; f++) {
+    var row = t[f];
+    var id = idInst_(row[C.esc]);
+    if (!id) continue;
+    var fecha = fecha_(row[C.fecha], zona);
+    var est = titulo_(row[C.est]) || 'Sin estado';
+    var o = out[id] || (out[id] = { total: 0, abiertos: 0, abiertoMasViejo: '', items: [] });
+    o.total++;
+    var abierto = !/resuel/i.test(est) && est !== 'Sin estado';
+    if (abierto) { o.abiertos++; if (fecha && (!o.abiertoMasViejo || fecha < o.abiertoMasViejo)) o.abiertoMasViejo = fecha; }
+    o.items.push([fecha, est, titulo_(row[C.tipo]), txt_(row[C.cat]), txt_(row[C.sub]), corto(row[C.det], 400), txt_(row[C.prod]),
+      txt_(row[C.serv]), txt_(row[C.prov]), txt_(row[C.resp]), fecha_(row[C.fres], zona), corto(row[C.acc], 300), txt_(row[C.prob]), f + 1]);
+  }
+  Object.keys(out).forEach(function (id) {
+    out[id].items.sort(function (a, b) { return a[0] === b[0] ? b[13] - a[13] : (a[0] < b[0] ? 1 : -1); });
+    out[id].items = out[id].items.slice(0, MAX_RECLAMOS);
+  });
+  return out;
 }
 
 // ─────────────────────────────── Armado de datos ───────────────────────────────
@@ -410,4 +484,4 @@ function leerObras_(t, ctx) {
 }
 
 // Para poder probarlo fuera de Google (node)
-if (typeof module !== 'undefined') module.exports = { construirDatos: construirDatos, idInst_: idInst_, VERSION_SCRIPT: VERSION_SCRIPT };
+if (typeof module !== 'undefined') module.exports = { construirDatos: construirDatos, construirReclamos: construirReclamos, idInst_: idInst_, VERSION_SCRIPT: VERSION_SCRIPT };

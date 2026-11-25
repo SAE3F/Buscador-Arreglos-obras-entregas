@@ -111,7 +111,8 @@
       <article class="card">
         <div class="card-header">
           <div><h2>📊 Vista <span class="highlight">general</span></h2><p class="card-subtitle">Combiná filtros; todos los gráficos se actualizan juntos</p></div>
-          <button type="button" class="btn btn-secondary btn-sm" id="gLimpiar">✖ Limpiar filtros</button>
+          <div class="fila"><button type="button" class="btn btn-secondary btn-sm" id="gLinkF" title="Copia un link que abre esta vista con los mismos filtros">🔗 Link con filtros</button>
+          <button type="button" class="btn btn-secondary btn-sm" id="gLimpiar">✖ Limpiar filtros</button></div>
         </div>
         <div class="card-body">
           <div class="filtros" style="margin-bottom:.7rem">
@@ -129,6 +130,23 @@
             <div class="campo"><label for="gLocalidad">Localidad</label><select id="gLocalidad"></select></div>
             <div class="campo"><label for="gProv">Proveedor</label><select id="gProv"></select></div>
           </div>
+          <details class="mas-filtros" id="gMas">
+            <summary>➕ Más filtros <span class="cuenta" id="gMasCuenta"></span></summary>
+            <div class="filtros" style="margin-top:.7rem">
+              <div class="campo ancho"><label for="gQ">Buscar en el detalle</label><input type="search" id="gQ" placeholder="ej. termotanque, ventilador"></div>
+              <div class="campo"><label for="gPeriodo">Período</label><select id="gPeriodo"><option value="">Todo</option><option value="mes">Este mes</option><option value="3m">Últimos 3 meses</option>
+                <option value="anio">Este año</option><option value="pasado">Año pasado</option><option value="pers">Elegir fechas…</option></select></div>
+              <div class="campo oculto" id="gFechas"><label>Desde / hasta</label><div class="fila" style="gap:.3rem;flex-wrap:nowrap"><input type="date" id="gDesde" aria-label="Desde"><input type="date" id="gHasta" aria-label="Hasta"></div></div>
+              <div class="campo"><label for="gServicio">Servicio SAE</label><select id="gServicio"></select></div>
+              <div class="campo"><label for="gFuente">Planilla</label><select id="gFuente"></select></div>
+            </div>
+            <div class="campo" style="margin-top:.7rem"><label>Meses</label><div class="chips" id="gMeses"></div></div>
+            <div class="campo" style="margin-top:.7rem"><label for="gInstAgregar">Comparar instituciones</label>
+              <div class="fila" style="gap:.4rem"><input type="search" id="gInstAgregar" list="dlInst" placeholder="Escribí y elegí: EP 12, JI 921…" style="max-width:320px">
+              <div class="chips" id="gInsts"></div></div></div>
+            <label class="check" style="margin-top:.7rem"><input type="checkbox" id="gSinFecha" checked> Incluir registros sin fecha exacta (solo año) en los filtros de fecha</label>
+          </details>
+          <div class="chips filtros-activos" id="gChips"></div>
         </div>
       </article>
 
@@ -163,7 +181,8 @@
       <article class="card">
         <div class="card-header">
           <div><h2>📋 Todos los <span class="highlight">registros</span></h2><p class="card-subtitle" id="rSub"></p></div>
-          <button type="button" class="btn btn-primary btn-sm" id="rExcel">⬇️ Excel</button>
+          <div class="fila"><button type="button" class="btn btn-secondary btn-sm" id="rLinkF" title="Copia un link que abre esta vista con los mismos filtros">🔗 Link con filtros</button>
+          <button type="button" class="btn btn-primary btn-sm" id="rExcel">⬇️ Excel</button></div>
         </div>
         <div class="card-body">
           <div class="filtros" style="margin-bottom:.9rem">
@@ -174,6 +193,26 @@
             <div class="campo"><label for="rProv">Proveedor</label><select id="rProv"></select></div>
             <div class="campo"><label for="rFuente">Planilla</label><select id="rFuente"></select></div>
           </div>
+          <details class="mas-filtros" id="rMas" style="margin:-.3rem 0 .8rem">
+            <summary>➕ Más filtros <span class="cuenta" id="rMasCuenta"></span></summary>
+            <div class="filtros" style="margin-top:.7rem">
+              <div class="campo"><label for="rPeriodo">Período</label><select id="rPeriodo"><option value="">Todo</option><option value="mes">Este mes</option><option value="3m">Últimos 3 meses</option>
+                <option value="anio">Este año</option><option value="pasado">Año pasado</option><option value="pers">Elegir fechas…</option></select></div>
+              <div class="campo oculto" id="rFechas"><label>Desde / hasta</label><div class="fila" style="gap:.3rem;flex-wrap:nowrap"><input type="date" id="rDesde" aria-label="Desde"><input type="date" id="rHasta" aria-label="Hasta"></div></div>
+              <div class="campo"><label for="rMes">Mes</label><select id="rMes"></select></div>
+              <div class="campo"><label for="rInst">Institución</label><input type="search" id="rInst" list="dlInst" placeholder="EP 12, JI 921…"></div>
+              <div class="campo"><label for="rNivel">Nivel</label><select id="rNivel"></select></div>
+              <div class="campo"><label for="rGestion">Gestión</label><select id="rGestion"></select></div>
+              <div class="campo"><label for="rLocalidad">Localidad</label><select id="rLocalidad"></select></div>
+              <div class="campo" style="min-width:120px"><label for="rCantMin">Cantidad mínima</label><input type="number" id="rCantMin" min="0" placeholder="ej. 10"></div>
+            </div>
+            <div class="fila" style="margin-top:.6rem;gap:1.2rem">
+              <label class="check"><input type="checkbox" id="rSinFecha" checked> Incluir registros sin fecha exacta (solo año)</label>
+              <label class="check"><input type="checkbox" id="rAgrupar" checked> Agrupar los trabajos de un mismo arreglo</label>
+            </div>
+          </details>
+          <div class="fila" style="margin-bottom:.8rem;align-items:flex-start"><div class="chips filtros-activos" id="rChips" style="flex:1"></div>
+            <button type="button" class="btn btn-secondary btn-sm" id="rLimpiar">✖ Limpiar filtros</button></div>
           <div class="tabla-caja" id="rTabla"></div>
           <div class="paginas" id="rPaginas"></div>
         </div>
@@ -189,12 +228,16 @@
   <footer class="pie" id="pie">Ficha Escuelas · Tres de Febrero · Entregas, obras y arreglos</footer>
   <div class="toasts" id="toasts" aria-live="polite"></div>
   <div class="tooltip oculto" id="tooltip" role="tooltip"></div>
+  <datalist id="dlInst"></datalist>
+  <div class="modal-fondo oculto" id="visita" role="dialog" aria-modal="true" aria-labelledby="visitaTitulo"></div>
+  <div id="impresion" aria-hidden="true"></div>
 
   <script src="js/config.js"></script>
   <script src="js/version.js"></script>
   <script src="js/util.js"></script>
   <script src="js/excel.js"></script>
   <script src="js/escuelas-extra.js"></script>
+  <script src="js/coordenadas.js"></script>
   <script src="js/datos.js"></script>
   <script src="js/graficos.js"></script>
   <script src="js/app.js"></script>

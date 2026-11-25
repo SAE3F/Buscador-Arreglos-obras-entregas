@@ -9,15 +9,15 @@ No escribe ni borra nada. Hay que publicarlo con una cuenta de Google que **pued
    - La primera vez Google pide permiso: *Revisar permisos* → elegí tu cuenta → *Configuración avanzada* →
      *Ir a SAE Entregas (no seguro)* → *Permitir*. (Dice "no seguro" porque es un script propio, no de una empresa verificada.)
    - Abajo, en **Registro de ejecución**, tiene que aparecer algo como
-     `Versión 1.0.0 · 4318 registros · 300 instituciones · 120 avisos`.
+     `Versión 1.2.0 · 4318 registros · 300 instituciones · 120 avisos`.
 4. **Implementar → Nueva implementación** → engranaje ⚙️ → **Aplicación web**.
-   - Descripción: `v1.0.0`
+   - Descripción: `v1.2.0`
    - Ejecutar como: **Yo**
    - Quién tiene acceso: **Cualquier persona**
    - **Implementar** y copiá la **URL de la aplicación web** (termina en `/exec`).
 5. Pegá esa URL en `js/config.js` → `SCRIPT_URL: '…/exec'`.
 
-Para probar que anda: abrí la URL en el navegador. Tiene que mostrar texto que empieza con `{"ok":true,"version":"1.0.0"…`.
+Para probar que anda: abrí la URL en el navegador. Tiene que mostrar texto que empieza con `{"ok":true,"version":"1.2.0"…`.
 
 ## Cuando cambie el script
 Pegá el código nuevo, guardá y andá a **Implementar → Administrar implementaciones → ✏️ → Versión: Nueva versión → Implementar**.
@@ -27,3 +27,7 @@ La URL **no cambia**. Si el número de `VERSION_SCRIPT` no coincide con `VERSION
 Hace falta para que la página pueda pedir los datos sin que cada visitante inicie sesión en Google. Quien tenga la URL del
 script puede ver los mismos datos que muestra la página (sin montos ni facturas mientras `INCLUIR_MONTOS = false`).
 Por eso: no compartir la URL fuera del equipo, y sumar la página al Portal Educación 3F cuando esté lista.
+
+## Reclamos (desde 1.2.0)
+El script también lee la hoja **Reclamos** del Tablero (solo lectura). La cuenta que publica tiene que poder abrir el Tablero.
+Para probar: `<URL>/exec?accion=reclamos&inst=EP 12` tiene que devolver `{"ok":true,…,"reclamos":{"total":…}}`.

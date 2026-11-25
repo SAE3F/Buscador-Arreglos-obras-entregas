@@ -8,6 +8,7 @@ Lee (sin modificar) tres planillas de Google a través de un Apps Script propio.
 | 🔎 Buscador | Búsqueda por institución, ficha con indicadores, línea de tiempo, qué recibió y detalle completo (Excel e impresión) |
 | 📊 Vista general | Filtros combinables (tipo, años, categoría, nivel, gestión, localidad, proveedor) y gráficos; institución × categoría |
 | 📋 Registros | Todos los registros con búsqueda, orden y Excel |
+| 📄 Ficha para visita | Desde la ficha: elegir apartados, columnas, período y formato; imprimir / guardar PDF (hojas numeradas) o Excel |
 | 🩺 Calidad de datos | Problemas agrupados por tipo, con botón **↗ Ir a la celda** que abre la planilla justo donde hay que revisar |
 
 ## De dónde salen los datos
@@ -20,9 +21,13 @@ Lee (sin modificar) tres planillas de Google a través de un Apps Script propio.
 | Facturación SAE 2026 | FACTURACION UNIDADES | Utensilios y equipamiento → entregas · Atmosférico y canaletas → arreglos (el servicio alimentario no entra) |
 | Facturación SAE 2026 | FACTURACION ITEMS | Arreglos (gas, electricidad, plomería, refrigeración) |
 
+## Reclamos
+Solo lectura. Salen de **SAE | Tablero Gestión → Reclamos**. El script (1.2.0+) los manda por escuela (`?accion=reclamos&inst=EP 12`, últimos 20)
+cuando se abre una ficha. No se mandan patologías, cupos ni horarios.
+
 ## Archivos
 - `index.html` · la página. `css/` estilos (`tokens-3f.css` es el del kit, sin cambios). `js/` lógica:
-  `config.js` (solo la URL del script: se completa una vez y no viene en las actualizaciones), `version.js` (versiones: viene en cada actualización), `datos.js` (carga y copia guardada), `app.js` (vistas), `graficos.js` (gráficos SVG sin librerías), `excel.js` (Excel sin librerías).
+  `config.js` (solo la URL del script: se completa una vez y no viene en las actualizaciones), `version.js` (versiones: viene en cada actualización), `escuelas-extra.js` (dirección y directora, del equipo), `coordenadas.js` (lat/lng de cada escuela, del mapa de SAE Gestión: solo nombre y coordenadas), `datos.js` (carga y copia guardada), `app.js` (vistas), `graficos.js` (gráficos SVG sin librerías), `excel.js` (Excel sin librerías).
 - `apps-script/Codigo.gs` · el script que lee las planillas. Cómo publicarlo: `apps-script/PUBLICAR.md`.
 - `vercel.json` · encabezados de seguridad del kit. `AGENTS.md` · reglas del ecosistema.
 
