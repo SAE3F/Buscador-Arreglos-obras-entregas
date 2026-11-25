@@ -533,3 +533,14 @@ html:not(.dark) .tabla-fija tr.fila-sub:hover td, html:not(.dark) .tabla-fija tr
   html:not(.dark) .tabla-fija tr.fila-sub, html:not(.dark) .tabla-fija tr.fila-hijo { box-shadow: inset 5px 0 0 #2a78d6; }
   html:not(.dark) .tabla-fija tr { border-bottom-color: rgba(22,60,104,.16); }
 }
+
+/* ===== v0.6.2 · Modo claro: dentro del día, escuela en amarillo y trabajos en gris ===== */
+html:not(.dark) { --dentro-sub: #fdeca6; --dentro-hijo: #eceff3; }
+html:not(.dark) .tabla-fija tr.fila-sub td:first-child { box-shadow: inset 5px 0 0 #c99a00; }
+html:not(.dark) .tabla-fija tr.fila-hijo td:first-child { box-shadow: inset 5px 0 0 #64748b; }
+html:not(.dark) .tabla-fija tr.fila-sub:hover td { background: #fbe382; }
+html:not(.dark) .tabla-fija tr.fila-hijo:hover td { background: #e0e4ea; }
+@media (max-width: 640px) {
+  html:not(.dark) .tabla-fija tr.fila-sub { box-shadow: inset 5px 0 0 #c99a00; }
+  html:not(.dark) .tabla-fija tr.fila-hijo { box-shadow: inset 5px 0 0 #64748b; }
+}
