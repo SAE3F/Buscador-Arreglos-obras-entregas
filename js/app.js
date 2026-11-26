@@ -253,8 +253,8 @@
     if (S.vista === 'general') pintarGeneral();
     if (S.vista === 'registros') pintarRegistros();
     if (S.vista === 'calidad') pintarCalidad();
-    $('#pie').textContent = 'Ficha Escuelas · Tres de Febrero · Entregas, obras y arreglos · versión ' + CONFIG.VERSION_PAGINA +
-      (Datos.meta ? ' · script ' + Datos.meta.version : '');
+    $('#pie').innerHTML = 'Ficha Escuelas · Tres de Febrero · Entregas, obras y arreglos · versión ' + esc(CONFIG.VERSION_PAGINA) +
+      (Datos.meta ? ' · script ' + esc(Datos.meta.version) : '') + ' · <a href="estado.html">🩺 Estado del sistema</a>';
   }
   function esqueleto() {
     $('#tablaInst').innerHTML = '<div style="padding:1rem">' + [1, 2, 3, 4, 5, 6].map(function () { return '<div class="esqueleto" style="height:34px;margin-bottom:8px"></div>'; }).join('') + '</div>';
@@ -1751,6 +1751,11 @@
     if ('serviceWorker' in navigator && (location.protocol === 'https:' || /^(localhost|127\.0\.0\.1)$/.test(location.hostname))) {
       window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function (e) { console.warn('Sin modo sin internet:', e); }); });
     }
+    vigilarVersion();
+    try {   // para "Estado del sistema": qué versión se abrió en este dispositivo
+      localStorage.setItem('fe-version-abierta', JSON.stringify({ v: CONFIG.VERSION_PAGINA, t: Date.now(),
+        app: (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true }));
+    } catch (e) {}
     var btn = $('#btnInstalar'), pedido = null;
     var instalada = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
     var ios = /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
@@ -1762,6 +1767,46 @@
       if (pedido) { pedido.prompt(); pedido.userChoice.then(function () { pedido = null; btn.classList.add('oculto'); }); return; }
       if (ios) mostrarAyudaIOS();
     };
+  }
+  // ───────────────────────── Aviso de versión nueva (v0.8.4)
+  // Cada 5 minutos, al volver a la pestaña y al volver la señal se fija en js/version.js del servidor.
+  // Si la versión es distinta a la que está corriendo, aparece un cartel para actualizar.
+  var VER_POSPUESTA = { v: '', hasta: 0 };
+  function vigilarVersion() {
+    function chequear() {
+      if (navigator.onLine === false || document.hidden || $('#avisoVersion')) return;
+      fetch('js/version.js?chequeo=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.ok ? r.text() : ''; }).then(function (t) {
+        var m = /VERSION_PAGINA\s*=\s*['"]([^'"]+)['"]/.exec(t || ''); if (!m) return;
+        var nueva = m[1], actual = CONFIG.VERSION_PAGINA;
+        if (nueva === actual) return;
+        if (VER_POSPUESTA.v === nueva && Date.now() < VER_POSPUESTA.hasta) return;
+        avisoVersionNueva(actual, nueva);
+      }).catch(function () {});
+    }
+    setTimeout(chequear, 8000);
+    setInterval(chequear, 5 * 60 * 1000);
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) chequear(); });
+    window.addEventListener('online', function () { setTimeout(chequear, 2000); });
+  }
+  function avisoVersionNueva(actual, nueva) {
+    var m = document.createElement('div'); m.className = 'modal-fondo aviso-version'; m.id = 'avisoVersion';
+    m.innerHTML = '<div class="modal card" role="alertdialog" aria-labelledby="avTit" aria-describedby="avTxt" style="max-width:430px">' +
+      '<div class="card-body"><div class="av-icono">🔄</div><h2 id="avTit">Hay una actualización</h2>' +
+      '<p id="avTxt">Se subió una versión nueva de Ficha Escuelas (<b>' + esc(actual) + '</b> → <b>' + esc(nueva) + '</b>). Actualizá la página para ver los cambios.</p>' +
+      '<div class="av-botones"><button type="button" class="btn btn-secondary" data-av="luego">Más tarde</button>' +
+      '<button type="button" class="btn btn-primary" data-av="ya">🔄 Actualizar ahora</button></div></div></div>';
+    document.body.appendChild(m);
+    setTimeout(function () { var b = $('[data-av="ya"]', m); if (b) b.focus(); }, 30);
+    m.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-av]'); if (!b) return;
+      if (b.dataset.av === 'luego') { VER_POSPUESTA = { v: nueva, hasta: Date.now() + 30 * 60 * 1000 }; m.remove(); return; }   // vuelve a avisar en 30 min
+      b.disabled = true; b.textContent = '⏳ Actualizando…';
+      var recargar = function () { location.reload(); };
+      if (navigator.serviceWorker && navigator.serviceWorker.getRegistration) {
+        navigator.serviceWorker.getRegistration().then(function (r) { return r && r.update(); }).catch(function () {}).then(recargar);
+      } else recargar();
+    });
+    m.addEventListener('keydown', function (e) { if (e.key === 'Escape') { VER_POSPUESTA = { v: nueva, hasta: Date.now() + 30 * 60 * 1000 }; m.remove(); } });
   }
   function mostrarAyudaIOS() {
     var m = document.createElement('div'); m.className = 'modal-fondo';

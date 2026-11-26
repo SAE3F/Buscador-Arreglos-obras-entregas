@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Estado del sistema · Ficha Escuelas</title>
+  <meta name="robots" content="noindex">
+  <link rel="icon" type="image/png" href="assets/logo_3f_chico.png">
+  <meta name="theme-color" content="#163C68">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/tokens-3f.css">
+  <link rel="stylesheet" href="css/app.css">
+  <script>
+    (function () {
+      var g = null; try { g = localStorage.getItem('modo-oscuro'); } catch (e) {}
+      var osc = g !== null ? g === 'true' : (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
+      if (osc) document.documentElement.classList.add('dark');
+    })();
+  </script>
+</head>
+<body class="pagina-estado">
+  <header class="app-header">
+    <div class="header-container">
+      <div class="brand">
+        <div class="brand-logo-3f"><img src="assets/logo_3f_96.png" alt="Municipalidad de Tres de Febrero" width="44" height="44"></div>
+        <div class="brand-text">
+          <h1>Estado del <span class="highlight">sistema</span></h1>
+          <div class="tagline">Ficha Escuelas · revisa archivos, versiones, script y datos</div>
+        </div>
+      </div>
+      <div class="header-acciones">
+        <a class="btn btn-secondary btn-sm" href="index.html?vista=buscador">← <span class="txt-largo">Volver a la página</span></a>
+        <button type="button" class="btn btn-secondary btn-icono" id="btnModo" aria-label="Cambiar modo claro/oscuro" title="Modo oscuro / claro">🌙</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="app-main est-main">
+    <section class="card est-resumen" id="estResumen" aria-live="polite">
+      <span class="est-ico">⏳</span><div><h2>Revisando…</h2><p>Esto tarda unos segundos.</p></div>
+    </section>
+    <div class="est-botones">
+      <button type="button" class="btn btn-primary btn-sm" id="btnRevisar">🔄 Volver a revisar</button>
+      <button type="button" class="btn btn-secondary btn-sm" id="btnCopiar">📋 Copiar informe</button>
+      <button type="button" class="btn btn-secondary btn-sm" id="btnWhatsApp">💬 Compartir por WhatsApp</button>
+    </div>
+    <div id="estGrupos"></div>
+    <p class="chico muted est-pie">Esta página solo lee: no cambia nada en las planillas ni en el script. Lo de "Este dispositivo" se refiere al navegador donde la abriste.</p>
+  </main>
+  <div class="toasts" id="toasts" aria-live="polite"></div>
+
+  <script src="js/config.js"></script>
+  <script src="js/version.js"></script>
+  <script src="js/escuelas-extra.js"></script>
+  <script src="js/coordenadas.js"></script>
+  <script src="js/estado.js"></script>
+</body>
+</html>

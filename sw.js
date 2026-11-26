@@ -41,12 +41,13 @@ self.addEventListener('fetch', function (e) {
   }
   if (url.origin !== self.location.origin) return;          // Apps Script, Maps, etc.: van directo
   if (/\.json$/.test(url.pathname)) return;                  // archivos de prueba
+  if (url.searchParams.has('chequeo')) return;               // aviso de versión nueva: siempre directo al servidor
   e.respondWith(redPrimero(req));
 });
 
 function redPrimero(req) {
   return caches.open(CACHE).then(function (c) {
-    var clave = req.mode === 'navigate' ? 'index.html' : req;
+    var clave = req.mode === 'navigate' ? (/estado\.html$/.test(new URL(req.url).pathname) ? 'estado.html' : 'index.html') : req;
     var red = fetch(req).then(function (res) {
       if (res && res.ok) c.put(clave, res.clone());
       return res;
