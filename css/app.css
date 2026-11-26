@@ -672,3 +672,15 @@ html.dark .rec-rel { background: rgba(57,135,229,.12); border: 1px dashed rgba(5
   .check { min-height: 32px; }
   .pie { padding-bottom: 1.2rem; }
 }
+
+/* Ficha para visita: cuántos mostrar por apartado */
+.v-lim { align-items: center; }
+.v-lim-et { min-width: 120px; font-weight: 600; font-size: .86rem; }
+@media (max-width: 640px) { .v-lim-et { min-width: 100%; } }
+
+/* Ficha para visita: fechas a mano y renglones resumidos */
+.v-fechas { align-items: flex-end; gap: .6rem; margin-top: .4rem; }
+.v-fechas[hidden] { display: none; }
+.v-fechas .campo { display: flex; flex-direction: column; gap: .2rem; font-size: .8rem; font-weight: 600; min-width: 140px; }
+.impr tr.resumen td { background: #f3f5f9; }
+.impr tr.resumen td:first-child { font-weight: 700; white-space: nowrap; }

@@ -53,7 +53,8 @@
   var MQ_CEL = window.matchMedia ? matchMedia('(max-width: 640px)') : { matches: false };
   function esCel() { return MQ_CEL.matches; }
   var POR_TANDA_CEL = 50;
-  var PLEG_ABIERTOS = new Set();          // qué cajas de filtros están abiertas en el celular (sobrevive a los repintados)
+  var PLEG_ABIERTOS = new Set();
+  var REC_ABIERTOS = new Set();           // reclamos abiertos en el celular (no se cierran al repintar)          // qué cajas de filtros están abiertas en el celular (sobrevive a los repintados)
   function cuentaPleg(id, k) {
     var c = document.getElementById(id + 'Cuenta'); if (!c) return;
     c.textContent = k ? String(k) : '';
@@ -426,7 +427,7 @@
       ['🍽️ Servicio SAE', i.servicio]
     ].filter(function (e) { return e[1]; }).map(function (e) {
       return '<span class="etiqueta' + (e[2] ? ' destacada' : ' secundaria') + '">' + e[0] + ': <b>' + esc(e[1]) + '</b></span>';
-    }).join('') + '<button type="button" class="btn btn-secondary btn-sm solo-cel-flex" id="fMasDatos" aria-expanded="false">➕ Más datos</button>';
+    }).join('') + '<button type="button" class="btn btn-secondary btn-sm solo-cel-flex" id="fMasDatos" aria-expanded="' + !!S.masDatos + '">' + (S.masDatos ? '➖ Menos datos' : '➕ Más datos') + '</button>';
     var alias = (i.alias || []).length ? '<div class="chico muted" style="margin-top:.65rem">También aparece escrita como: ' + i.alias.map(esc).join(' · ') + '</div>' : '';
 
     var html = '<article class="card sec"><div class="card-body"><div class="ficha-cab"><div class="ficha-info">' +
@@ -498,7 +499,8 @@
     $('#fCerrar').onclick = function () { S.inst = null; guardarUrl(true); pintar(); };
     $('#fExcel').onclick = function () { excelEscuela(i, regs, opcionesVisita(), false); };
     $('#fVisita').onclick = function () { abrirVisita(i, regs); };
-    $('#fMasDatos').onclick = function () { var c = this.closest('.etiquetas'), ab = !c.classList.contains('ver-todo'); c.classList.toggle('ver-todo', ab); this.setAttribute('aria-expanded', String(ab)); this.textContent = ab ? '➖ Menos datos' : '➕ Más datos'; };
+    var mdC = $('#fMasDatos').closest('.etiquetas'); mdC.classList.toggle('ver-todo', !!S.masDatos);
+    $('#fMasDatos').onclick = function () { S.masDatos = !S.masDatos; mdC.classList.toggle('ver-todo', S.masDatos); this.setAttribute('aria-expanded', String(S.masDatos)); this.textContent = S.masDatos ? '➖ Menos datos' : '➕ Más datos'; };
     aplicarPleg('fPleg');
     barraFicha(i, regs);
     $('#fRecN').onclick = function (ev) { var b = ev.target.closest('[data-n]'); if (!b) return; try { localStorage.setItem('sae-reclamos-n', b.dataset.n); } catch (e) {}
@@ -575,7 +577,8 @@
   function htmlReclamo(r, instId) {
     var dias = r.fecha && r.fres ? diasEntre(r.fecha, r.fres) : null;
     var tema = [r.tipo, r.cat, r.sub].filter(Boolean).join(' › ');
-    return '<div class="reclamo est-' + claseEstado(r.estado) + '"><div class="rec-cab"><span class="estado-pill">' + esc(r.estado) + '</span>' +
+    var clave = (instId || '') + '|' + (r.ref ? r.ref[1] : r.fecha + r.det);
+    return '<div class="reclamo est-' + claseEstado(r.estado) + (REC_ABIERTOS.has(clave) ? ' abierto' : '') + '" data-rec="' + esc(clave) + '"><div class="rec-cab"><span class="estado-pill">' + esc(r.estado) + '</span>' +
       '<b class="num">' + (r.fecha ? U.fecha(r.fecha) : 's/f') + '</b><span>' + esc(tema) + '</span>' +
       '<span class="muted chico">' + esc([r.serv, r.prov].filter(Boolean).join(' · ')) + '</span><span class="espacio"></span>' + botonIr(r.ref) + '</div>' +
       '<div class="rec-det">' + esc(r.det) + (r.prod ? ' <span class="muted">(' + esc(r.prod) + ')</span>' : '') + '</div>' +
@@ -601,16 +604,23 @@
 
   // ───────────────────────── Ficha para visita (imprimir / PDF / Excel)
   var CLAVE_VISITA = 'sae-ficha-visita';
-  var SECCIONES = [['datos', '🏫 Datos de la escuela'], ['resumen', '📊 Resumen'], ['reclamos', '📣 Últimos reclamos'],
-    ['E', '📦 Entregas'], ['O', '🏗️ Obras'], ['A', '🛠️ Arreglos']];
+  var SECCIONES = [['datos', '🏫 Datos de la escuela'], ['resumen', '📊 Resumen'],
+    ['E', '📦 Entregas'], ['O', '🏗️ Obras'], ['A', '🛠️ Arreglos'], ['reclamos', '📣 Últimos reclamos']];   // los reclamos van al final de la hoja
   var COLS_V = [['fecha', 'Fecha'], ['cat', 'Categoría / rubro'], ['det', 'Detalle'], ['cant', 'Cantidad'], ['prov', 'Proveedor'], ['fuente', 'Planilla']];
   var COLS_R = [['estado', 'Estado'], ['fecha', 'Fecha'], ['tema', 'Tipo y categoría'], ['det', 'Detalle'], ['res', 'Resolución'], ['resp', 'Responsable'], ['acc', 'Acciones']];
   function opcionesVisita() {
-    var o = { sec: {}, cols: {}, recCols: {}, periodo: 'todo', formato: 'resumida', recN: recN(), agrupar: true };
+    var o = { sec: {}, cols: {}, recCols: {}, periodo: 'todo', desde: '', hasta: '', lim: { E: 'todos', O: 'todos', A: 'todos' }, resumir: true, recN: recN(), agrupar: true };
     SECCIONES.forEach(function (x) { o.sec[x[0]] = true; });
     COLS_V.forEach(function (x) { o.cols[x[0]] = x[0] !== 'fuente'; });
     COLS_R.forEach(function (x) { o.recCols[x[0]] = x[0] !== 'resp' && x[0] !== 'acc'; });
-    try { var g = JSON.parse(localStorage.getItem(CLAVE_VISITA) || 'null'); if (g) ['sec', 'cols', 'recCols'].forEach(function (k) { Object.assign(o[k], g[k] || {}); }), ['periodo', 'formato', 'recN', 'agrupar'].forEach(function (k) { if (g[k] != null) o[k] = g[k]; }); } catch (e) {}
+    try {
+      var g = JSON.parse(localStorage.getItem(CLAVE_VISITA) || 'null');
+      if (g) {
+        ['sec', 'cols', 'recCols', 'lim'].forEach(function (k) { Object.assign(o[k], g[k] || {}); });
+        ['periodo', 'desde', 'hasta', 'recN', 'agrupar', 'resumir'].forEach(function (k) { if (g[k] != null) o[k] = g[k]; });
+        if (!g.lim && g.formato === 'resumida') o.lim = { E: 10, O: 10, A: 10 };   // venía del formato "Resumida" (0.8.0 y antes)
+      }
+    } catch (e) {}
     return o;
   }
   function fichaPasa(r) {          // los mismos filtros que la ficha (sin la pestaña)
@@ -622,12 +632,47 @@
     if (F.prov && r.prov !== F.prov) return false;
     return !q || r.busca.indexOf(q) >= 0;
   }
+  var MESES_VISITA = { '1m': 1, '3m': 3, '6m': 6, '12m': 12 };
+  function rangoVisita(o) {
+    var h = new Date();
+    if (MESES_VISITA[o.periodo]) return [iso(new Date(h.getFullYear(), h.getMonth() - MESES_VISITA[o.periodo], h.getDate())), iso(h)];
+    if (o.periodo === 'pers') { var a = o.desde || '0000-01-01', b = o.hasta || '9999-12-31'; return a <= b ? [a, b] : [b, a]; }
+    return null;
+  }
+  function textoPeriodoVisita(o) {
+    if (o.periodo === 'pers') {
+      var rg = rangoVisita(o), f = function (x) { return /^0000|^9999/.test(x) ? '…' : U.fecha(x); };
+      return 'Del ' + f(rg[0]) + ' al ' + f(rg[1]);
+    }
+    return { todo: 'Todo el historial', '1m': 'Último mes', '3m': 'Últimos 3 meses', '6m': 'Últimos 6 meses', '12m': 'Último año', ficha: 'Filtrado en la ficha' }[o.periodo] || '';
+  }
   function regsVisita(regs, o) {
     if (o.periodo === 'ficha') return regs.filter(fichaPasa);
-    if (o.periodo === '12m') { var h = new Date(), rg = [iso(new Date(h.getFullYear() - 1, h.getMonth(), h.getDate())), iso(h)]; return regs.filter(function (r) { return enRango(r, rg, true); }); }
-    return regs.slice();
+    var rg = rangoVisita(o);
+    return rg ? regs.filter(function (r) { return enRango(r, rg, true); }) : regs.slice();
   }
-  function listaTipo(regs, t, o) {
+  /** Lo anterior al año actual, en un renglón por categoría: "Utensilios · 2023–2025: Cuchillos (94), Compotera (20)…" */
+  function resumirViejos(rs, t) {
+    var por = new Map();
+    rs.forEach(function (r) {
+      var g = por.get(r.cat);
+      if (!g) por.set(r.cat, g = { cat: r.cat, a0: 9999, a1: 0, items: new Map(), cant: 0, n: 0, prov: new Map() });
+      var a = Number(r.anio) || 0; if (a) { g.a0 = Math.min(g.a0, a); g.a1 = Math.max(g.a1, a); }
+      var et = String(r.det || '(sin detalle)').replace(/:\s*$/, '').trim(), k = U.norm(et), it = g.items.get(k);
+      if (!it) g.items.set(k, it = { et: et, c: 0 });
+      it.c += t === 'E' ? (r.cant || 0) : 1;
+      g.cant += r.cant || 0; g.n++;
+      if (r.prov) g.prov.set(r.prov, (g.prov.get(r.prov) || 0) + 1);
+    });
+    return Array.from(por.values()).sort(function (a, b) { return b.a1 - a.a1 || U.ordenTexto(a.cat, b.cat); }).map(function (g) {
+      var its = Array.from(g.items.values()).sort(function (a, b) { return b.c - a.c || ordenEs(a.et, b.et); });
+      var txt = its.slice(0, 40).map(function (x) { return t === 'E' ? x.et + ' (' + n(x.c) + ')' : x.et + (x.c > 1 ? ' (×' + x.c + ')' : ''); }).join(', ') + (its.length > 40 ? ' y ' + n(its.length - 40) + ' más' : '');
+      var pv = Array.from(g.prov.entries()).sort(function (a, b) { return b[1] - a[1]; }).map(function (e) { return e[0]; });
+      return { anios: !g.a1 ? 's/f' : g.a0 === g.a1 ? String(g.a1) : g.a0 + '–' + g.a1, cat: g.cat, det: txt, cant: n(g.cant) + (t !== 'E' ? ' · ' + n(g.n) + ' trab.' : ''),
+        prov: pv.slice(0, 2).join(', ') + (pv.length > 2 ? ' y ' + (pv.length - 2) + ' más' : '') };
+    });
+  }
+  function listaTipo(regs, t, o) {   // (regs puede venir ya filtrado por tipo)
     var l = regs.filter(function (r) { return r.t === t; });
     if (t !== 'O' && o.agrupar) l = agruparArreglos(l);
     return l.sort(function (a, b) { return a.orden < b.orden ? 1 : a.orden > b.orden ? -1 : 0; });
@@ -639,8 +684,13 @@
     m.innerHTML = '<div class="modal card"><div class="card-header"><div><h2 id="visitaTitulo">📄 Ficha para visita · ' + esc(i.id) + '</h2><p class="card-subtitle">Elegí qué información llevar. Se recuerda para la próxima vez.</p></div>' +
       '<button class="btn btn-secondary btn-sm" data-cerrar aria-label="Cerrar">✕</button></div><div class="card-body modal-cuerpo">' +
       '<fieldset><legend>Apartados</legend><div class="opciones">' + caja('sec', SECCIONES, o.sec) + '</div></fieldset>' +
-      '<fieldset><legend>Período</legend><div class="opciones">' + radio('periodo', [['todo', 'Todo'], ['12m', 'Últimos 12 meses'], ['ficha', 'Lo que tengo filtrado en la ficha']], o.periodo) + '</div></fieldset>' +
-      '<fieldset><legend>Formato</legend><div class="opciones">' + radio('formato', [['resumida', 'Resumida (los últimos 10 de cada apartado)'], ['completa', 'Completa (todo el detalle)']], o.formato) + '</div></fieldset>' +
+      '<fieldset><legend>Período</legend><div class="opciones">' + radio('periodo', [['todo', 'Todo'], ['1m', 'Último mes'], ['3m', '3 meses'], ['6m', '6 meses'], ['12m', '1 año'], ['pers', 'Elegir fechas'], ['ficha', 'Lo que tengo filtrado en la ficha']], o.periodo) + '</div>' +
+      '<div class="opciones v-fechas" id="vFechas"' + (o.periodo === 'pers' ? '' : ' hidden') + '><label class="campo">Desde<input type="date" id="vDesde" value="' + esc(o.desde) + '"></label>' +
+      '<label class="campo">Hasta<input type="date" id="vHasta" value="' + esc(o.hasta) + '"></label><span class="chico muted">Podés dejar una vacía (desde el principio / hasta hoy).</span></div></fieldset>' +
+      '<fieldset><legend>Cuántos mostrar (los más recientes)</legend>' + TIPOS.map(function (t) {
+        return '<div class="opciones v-lim"><span class="v-lim-et">' + T[t].icono + ' ' + T[t].nombre + '</span>' + radio('lim' + t, [[5, '5'], [10, '10'], [20, '20'], ['todos', 'Todos']], o.lim[t]) + '</div>';
+      }).join('') + '<p class="chico muted" style="margin:.3rem 0 .4rem">Con “Agrupar” activado, en arreglos y facturación cada <b>día</b> cuenta como 1 (con todos sus trabajos adentro).</p>' +
+      '<label class="check"><input type="checkbox" data-g="x" data-k="resumir"' + (o.resumir ? ' checked' : '') + '> Resumir lo anterior a ' + new Date().getFullYear() + ' en un renglón por categoría (ej. “Utensilios · 2023–2025: Cuchillos (94), Compotera (20)…”)</label></fieldset>' +
       '<fieldset><legend>Columnas de entregas, obras y arreglos</legend><div class="opciones">' + caja('cols', COLS_V, o.cols) +
       '<label class="check"><input type="checkbox" data-g="x" data-k="agrupar"' + (o.agrupar ? ' checked' : '') + '> Agrupar los trabajos de un mismo arreglo</label></div></fieldset>' +
       '<fieldset><legend>Reclamos</legend><div class="opciones">' + radio('recN', [[5, 'Últimos 5'], [10, 'Últimos 10'], [20, 'Últimos 20']], o.recN) + '</div><div class="opciones">' + caja('recCols', COLS_R, o.recCols) + '</div></fieldset>' +
@@ -650,8 +700,10 @@
     m.classList.remove('oculto'); document.body.classList.add('con-modal');
     function leer() {
       var r = { sec: {}, cols: {}, recCols: {} };
-      $$('input[type=checkbox][data-g]', m).forEach(function (c) { if (c.dataset.g === 'x') r.agrupar = c.checked; else r[c.dataset.g][c.dataset.k] = c.checked; });
-      r.periodo = $('input[name=v_periodo]:checked', m).value; r.formato = $('input[name=v_formato]:checked', m).value; r.recN = Number($('input[name=v_recN]:checked', m).value);
+      $$('input[type=checkbox][data-g]', m).forEach(function (c) { if (c.dataset.g === 'x') r[c.dataset.k] = c.checked; else r[c.dataset.g][c.dataset.k] = c.checked; });
+      r.desde = $('#vDesde', m).value; r.hasta = $('#vHasta', m).value;
+      r.periodo = $('input[name=v_periodo]:checked', m).value; r.recN = Number($('input[name=v_recN]:checked', m).value);
+      r.lim = {}; TIPOS.forEach(function (t) { var v = $('input[name=v_lim' + t + ']:checked', m).value; r.lim[t] = v === 'todos' ? 'todos' : Number(v); });
       try { localStorage.setItem(CLAVE_VISITA, JSON.stringify(r)); } catch (e) {}
       return r;
     }
@@ -660,9 +712,11 @@
     m.onkeydown = function (e) { if (e.key === 'Escape') cerrar(); };
     // Los reclamos se piden apenas se abre la ventana (si no estaban ya), así imprimir es inmediato
     var listo = conReclamos(i, { sec: { reclamos: true } });
+    $$('input[name=v_periodo]', m).forEach(function (x) { x.onchange = function () { $('#vFechas', m).hidden = x.value !== 'pers' || !x.checked; if (x.value === 'pers' && x.checked) $('#vDesde', m).focus(); }; });
     function accion(fn) {
       return function () {
         var r = leer(), est = $('#vEstado');
+        if (r.periodo === 'pers' && !r.desde && !r.hasta) { if (est) est.textContent = '⚠️ Elegí al menos una fecha (desde o hasta).'; $('#vDesde', m).focus(); return; }
         $$('.modal-pie button', m).forEach(function (b) { b.disabled = true; });
         if (est) est.textContent = '⏳ Preparando…';
         listo.then(function () { cerrar(); fn(r); });
@@ -673,17 +727,18 @@
     $('#vExcel').onclick = accion(function (r) { excelEscuela(i, regs, r, true); });
     setTimeout(function () { var b = $('#vPdf'); if (b) b.focus(); }, 30);
   }
+  function limVisita(o, t) { var v = o.lim && o.lim[t]; return v === 'todos' || !v ? Infinity : Number(v); }
   function conReclamos(i, o) {
     if (!o.sec.reclamos) return Promise.resolve(null);
     return Datos.reclamos(i.id).catch(function () { return { error: true, total: 0, abiertos: 0, items: [] }; });
   }
   /** Modelo de la ficha para visita (lo usan la impresión y el PDF) */
   function armarVisita(i, regs, o, R) {
-    var sel = regsVisita(regs, o), LIM = o.formato === 'resumida' ? 10 : Infinity, cols = COLS_V.filter(function (c) { return o.cols[c[0]]; });
+    var sel = regsVisita(regs, o), cols = COLS_V.filter(function (c) { return o.cols[c[0]]; });
     var M = {
       titulo: i.id, sub: i.completo || '',
       fecha: new Date().toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ' ' + new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }),
-      periodo: { todo: 'Todo el historial', '12m': 'Últimos 12 meses', ficha: 'Filtrado en la ficha' }[o.periodo] + (o.formato === 'resumida' ? ' · resumida' : ' · completa'),
+      periodo: textoPeriodoVisita(o),
       secciones: []
     };
     if (o.sec.datos) M.secciones.push({ tipo: 'datos', titulo: 'Datos de la escuela', icono: '🏫', items: [['Dirección', i.direccion], ['Localidad', i.localidad],
@@ -697,6 +752,27 @@
       if (R && !R.error) k.push([n(R.abiertos), 'Reclamos sin resolver']);
       M.secciones.push({ tipo: 'resumen', titulo: 'Resumen', icono: '📊', items: k });
     }
+    TIPOS.forEach(function (t) {
+      if (!o.sec[t]) return;
+      var anioAct = new Date().getFullYear(), base = sel.filter(function (r) { return r.t === t; });
+      var rgV = rangoVisita(o), resumir = o.resumir && (!rgV || rgV[1] >= anioAct + '-01-01');   // si todo el período es de años anteriores, va en detalle
+      var viejos = resumir ? base.filter(function (r) { return (Number(r.anio) || 0) < anioAct; }) : [];
+      var l = listaTipo(resumir ? base.filter(function (r) { return (Number(r.anio) || 0) >= anioAct; }) : base, t, o), vis = l.slice(0, limVisita(o, t));
+      var res = resumirViejos(viejos, t);
+      M.secciones.push({ tipo: 'tabla', t: t, titulo: T[t].nombre, icono: T[t].icono, total: base.length, cols: cols.map(function (c) { return { k: c[0], t: c[1], der: c[0] === 'cant' }; }),
+        nota: base.length ? '' : 'Sin registros en este período.',
+        filas: vis.map(function (r) {
+          var v = { fecha: r.grupo ? fechaGrupo(r) : String(fechaReg(r)), cat: r.cat,
+            det: r.grupo ? r.det + ': ' + r.items.map(function (x) { return x.det.replace(/:\s*$/, '') + (x.cant > 1 ? ' (' + x.cant + ')' : ''); }).join(' · ') : r.det,
+            cant: n(r.cant), prov: r.prov, fuente: r.fuente };
+          var f = cols.map(function (c) { return v[c[0]] || ''; }); f.grupo = !!r.grupo; f.un = !!r.un; return f;
+        }).concat(res.map(function (g) {
+          var v = { fecha: g.anios, cat: g.cat, det: g.det, cant: g.cant, prov: g.prov, fuente: 'Resumen' };
+          var f = cols.map(function (c) { return v[c[0]] || ''; }); f.resumen = true; return f;
+        })),
+        mas: [l.length > vis.length ? 'Mostrando ' + n(vis.length) + ' de ' + n(l.length) + (resumir && res.length ? ' de ' + anioAct : '') + ' (los más recientes' + (t !== 'O' && o.agrupar && vis.some(function (x) { return x.grupo; }) ? '; cada día agrupado cuenta como 1' : '') + ').' : '',
+          res.length ? 'Lo anterior a ' + anioAct + ' va resumido: un renglón por categoría con los años, lo ' + (t === 'E' ? 'entregado y la cantidad' : 'hecho y las veces') + '.' : ''].filter(Boolean).join(' ') });
+    });
     if (o.sec.reclamos) {
       var rc = COLS_R.filter(function (c) { return o.recCols[c[0]]; }), S1 = { tipo: 'tabla', titulo: 'Últimos reclamos', icono: '📣', cols: rc.map(function (c) { return { k: c[0], t: c[1] }; }), filas: [] };
       if (!R || R.error) S1.nota = 'No se pudieron leer los reclamos.';
@@ -711,19 +787,6 @@
       }
       M.secciones.push(S1);
     }
-    TIPOS.forEach(function (t) {
-      if (!o.sec[t]) return;
-      var l = listaTipo(sel, t, o), vis = l.slice(0, LIM);
-      M.secciones.push({ tipo: 'tabla', t: t, titulo: T[t].nombre, icono: T[t].icono, total: l.length, cols: cols.map(function (c) { return { k: c[0], t: c[1], der: c[0] === 'cant' }; }),
-        nota: l.length ? '' : 'Sin registros en este período.',
-        filas: vis.map(function (r) {
-          var v = { fecha: r.grupo ? fechaGrupo(r) : String(fechaReg(r)), cat: r.cat,
-            det: r.grupo ? r.det + ': ' + r.items.map(function (x) { return x.det.replace(/:\s*$/, '') + (x.cant > 1 ? ' (' + x.cant + ')' : ''); }).join(' · ') : r.det,
-            cant: n(r.cant), prov: r.prov, fuente: r.fuente };
-          var f = cols.map(function (c) { return v[c[0]] || ''; }); f.grupo = !!r.grupo; f.un = !!r.un; return f;
-        }),
-        mas: l.length > vis.length ? '… y ' + n(l.length - vis.length) + ' más (elegí “Completa” para verlos todos).' : '' });
-    });
     return M;
   }
   /** Imprimir: hoja en blanco y negro con el diálogo de la impresora */
@@ -739,7 +802,7 @@
         else {
           if (S2.nota) h += '<p class="chico">' + esc(S2.nota) + '</p>';
           if (S2.filas.length) h += '<table><thead><tr>' + S2.cols.map(function (c) { return '<th' + (c.der ? ' class="num"' : '') + '>' + esc(c.t) + '</th>'; }).join('') + '</tr></thead><tbody>' +
-            S2.filas.map(function (f) { return '<tr' + (f.grupo ? ' class="grupo' + (f.un ? ' un' : '') + '"' : '') + '>' + f.map(function (v, k) { var c = S2.cols[k];
+            S2.filas.map(function (f) { return '<tr' + (f.grupo ? ' class="grupo' + (f.un ? ' un' : '') + '"' : f.resumen ? ' class="resumen"' : '') + '>' + f.map(function (v, k) { var c = S2.cols[k];
               return '<td' + (c.der ? ' class="num"' : c.k === 'fecha' || c.k === 'res' ? ' class="nw"' : '') + '>' + esc(v) + '</td>'; }).join('') + '</tr>'; }).join('') + '</tbody></table>';
           if (S2.mas) h += '<p class="chico">' + esc(S2.mas) + '</p>';
         }
@@ -808,7 +871,7 @@
           if (S2.filas.length) {
             d.y += 2;
             var anchos = { fecha: 1.1, cat: 1.5, det: 4.2, cant: 0.75, prov: 1.7, fuente: 1.6, estado: 1, tema: 2.2, res: 1.3, resp: 1.1, acc: 2.2 };
-            var filas = S2.filas.map(function (f) { var c = f.slice(); if (f.grupo) { c.fondo = f.un ? '#f1ecfb' : '#eaf7f1'; c.negrita = true; } if (f.estado) c.fondo = COLEST[f.estado]; return c; });
+            var filas = S2.filas.map(function (f) { var c = f.slice(); if (f.grupo) { c.fondo = f.un ? '#f1ecfb' : '#eaf7f1'; c.negrita = true; } if (f.resumen) c.fondo = '#f3f5f9'; if (f.estado) c.fondo = COLEST[f.estado]; return c; });
             d.tabla(S2.cols.map(function (c) { return { t: c.t, w: anchos[c.k] || 1.2, der: c.der }; }), filas, { tam: 7.8 });
           }
           if (S2.mas) d.parrafo(S2.mas, { tam: 8, color: '#555555' });
@@ -828,15 +891,16 @@
       if (o.sec.datos || !desdeVisita) hojas.push({ nombre: 'Datos', titulo: i.id + ' · datos de la escuela', subtitulo: sub, columnas: [{ t: 'Dato', ancho: 24 }, { t: 'Valor', ancho: 60 }],
         filas: [['Institución', i.id], ['Nombre completo', i.completo], ['Dirección', i.direccion], ['Localidad', i.localidad], ['Directora / director', i.directora], ['Cargo', i.cargo],
           ['Nivel', i.nivel], ['Gestión', i.gestion], ['CUE', i.cue], ['Matrícula / cupo SAE', i.matricula || ''], ['Servicio SAE', i.servicio], ['Cómo llegar (Google Maps)', urlComoLlegar(i)]].filter(function (x) { return x[1]; }) });
+      TIPOS.forEach(function (t) {
+        if (desdeVisita && !o.sec[t]) return;
+        var l = listaTipo(sel, t, desdeVisita ? o : { agrupar: true }), tot = l.length;
+        if (desdeVisita) l = l.slice(0, limVisita(o, t));
+        hojas.push({ nombre: T[t].nombre, titulo: i.id + ' · ' + T[t].nombre, subtitulo: sub + (l.length < tot ? ' · mostrando ' + n(l.length) + ' de ' + n(tot) + ' (los más recientes)' : ''), columnas: colsExcel(), filas: filasExcel(l) });
+      });
       if (R && !R.error && (o.sec.reclamos || !desdeVisita)) hojas.push({ nombre: 'Reclamos', titulo: i.id + ' · últimos reclamos', subtitulo: resumenReclamos(R) + ' · ' + sub,
         columnas: [{ t: 'Fecha', ancho: 11 }, { t: 'Estado', ancho: 12 }, { t: 'Tipo', ancho: 12 }, { t: 'Categoría', ancho: 16 }, { t: 'Subcategoría', ancho: 18 }, { t: 'Detalle', ancho: 60 },
           { t: 'Producto', ancho: 14 }, { t: 'Servicio', ancho: 18 }, { t: 'Proveedor', ancho: 16 }, { t: 'Responsable', ancho: 14 }, { t: 'Fecha resolución', ancho: 12 }, { t: 'Acciones', ancho: 40 }, { t: 'Fila', ancho: 7 }],
         filas: R.items.slice(0, desdeVisita ? o.recN : 20).map(function (r) { return [r.fecha ? U.fechaLarga(r.fecha) : '', r.estado, r.tipo, r.cat, r.sub, r.det, r.prod, r.serv, r.prov, r.resp, r.fres ? U.fechaLarga(r.fres) : '', r.acc, r.ref[1]]; }) });
-      TIPOS.forEach(function (t) {
-        if (desdeVisita && !o.sec[t]) return;
-        var l = listaTipo(sel, t, desdeVisita ? o : { agrupar: true });
-        hojas.push({ nombre: T[t].nombre, titulo: i.id + ' · ' + T[t].nombre, subtitulo: sub, columnas: colsExcel(), filas: filasExcel(l) });
-      });
       exportarExcel('Ficha Escuelas - ' + i.id, hojas);
     });
   }
@@ -1529,7 +1593,7 @@
       var pl = e.target.closest('[data-plegar]');
       if (pl) { var id = pl.dataset.plegar; if (PLEG_ABIERTOS.has(id)) PLEG_ABIERTOS.delete(id); else PLEG_ABIERTOS.add(id); aplicarPleg(id); return; }
       var rec = e.target.closest('.reclamo');
-      if (rec && esCel() && !e.target.closest('a,button')) { rec.classList.toggle('abierto'); return; }
+      if (rec && esCel() && !e.target.closest('a,button')) { var ab = rec.classList.toggle('abierto'); if (ab) REC_ABIERTOS.add(rec.dataset.rec); else REC_ABIERTOS.delete(rec.dataset.rec); return; }
       var fi = e.target.closest('tr.fila-inst');
       if (fi && !e.target.closest('a')) { abrirFicha(fi.dataset.abrir); }
     });
